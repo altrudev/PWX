@@ -1,0 +1,13 @@
+{
+  "name": "pwx-spike",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "PWX v0 spike: signed package verification and leak testing",
+  "scripts": {
+    "test": "node --test tests/verify.test.mjs",
+    "build": "node tools/build-packages.mjs",
+    "serve": "node server/serve.mjs"
+  },
+  "license": "Apache-2.0"
+}

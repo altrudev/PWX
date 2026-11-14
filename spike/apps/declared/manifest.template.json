@@ -1,0 +1,19 @@
+{
+  "pwx": "0",
+  "id": "org.example.declared",
+  "name": "Declared-host test",
+  "version": "1.0.0",
+  "entry": "app/index.html",
+  "capabilities": {
+    "network": {
+      "connect": [
+        "http://127.0.0.1:8199",
+        "ws://127.0.0.1:8199"
+      ],
+      "webrtc": "none"
+    },
+    "storage": {
+      "local": true
+    }
+  }
+}
