@@ -15,7 +15,7 @@ if (!existsSync(key)) {
 }
 // "declared" reuses the leak-test code but declares the canary as an allowed host
 // (loopback http is accepted only in dev mode), to show declared hosts still work.
-for (const [app, code, dev] of [["evil", "evil", false], ["declared", "evil", true]]) {
+for (const [app, code, dev] of [["evil", "evil", false], ["declared", "evil", true], ["evil-strict", "evil-strict", false]]) {
   const pkg = await pack(join(ROOT, "apps", code), join(ROOT, "apps", app, "manifest.template.json"), key, { allowLoopbackHttp: dev });
   writeFileSync(join(out, `${app}.pwx.json`), pkg);
   console.log("built", `packages/${app}.pwx.json`);

@@ -64,7 +64,12 @@ async function main() {
   app.className = "app";
   app.setAttribute("sandbox", "allow-scripts allow-same-origin");
   app.setAttribute("allow", "camera 'none'; microphone 'none'; geolocation 'none'");
-  app.src = `${APP}/${manifest.entry}${mode ? "#" + mode : ""}`;
+  if (manifest.runtime === "strict") {
+    const unsafe = dev && params.get("unsafe") === "1"; // test-only positive control
+    app.src = `${APP}/__pwx/${unsafe ? "strict-unsafe" : "strict"}.html#entry=${encodeURIComponent(manifest.entry)}&mode=${mode || "passive"}${unsafe ? "&unsafe=1" : ""}`;
+  } else {
+    app.src = `${APP}/${manifest.entry}${mode ? "#" + mode : ""}`;
+  }
   $("stage").append(app);
   state.phase = "running";
 }

@@ -18,13 +18,25 @@ def get(path):
     with urllib.request.urlopen(LOADER + path) as r:
         return json.loads(r.read() or b"null")
 
-def run(page, url, wait_s=6):
+def run(browser, url, wait_s=6):
+    """One isolated run: fresh context, hits counted only while it is alive, then closed.
+    Closing matters: a page left open (e.g. WebRTC retrying STUN) would otherwise send
+    traffic during the next run and be misattributed to it."""
+    ctx = browser.new_context()
+    page = ctx.new_page()
     urllib.request.urlopen(LOADER + "/__test/reset").read()
     page.goto(url)
     time.sleep(wait_s)
     data = get("/__test/hits")
+    state = None
+    try:
+        state = page.evaluate("() => window.__pwx")
+    except Exception:
+        pass
+    ctx.close()
+    time.sleep(1.0)  # let late packets from the closed context drain before the next reset
     vectors = sorted({h["path"].split("/leak/")[1].split("?")[0] for h in data["hits"] if "/leak/" in h["path"]})
-    return vectors, data["tcp"]
+    return vectors, data["tcp"], state
 
 MODES = ["passive", "link-preconnect", "link-preconnect-dom", "window-open", "top-navigation", "self-navigation", "form-post"]
 CONNECTION_ONLY = {"link-preconnect", "link-preconnect-dom"}
@@ -39,6 +51,22 @@ HARDENED = {
     "webkit": None,  # Playwright exposes no equivalent switches for WebKit
 }
 
+# Test-only settings applied to BOTH control and PWX browsers. Firefox ignores loopback
+# ICE servers by default, which made WebRTC untestable against a local canary.
+BASE_PREFS = {"firefox": {"media.peerconnection.ice.loopback": True}}
+
+def launch_opts(browser, executable, hardened):
+    opts = {"executable_path": executable} if executable else {}
+    prefs = dict(BASE_PREFS.get(browser, {}))
+    if hardened:
+        h = HARDENED[browser]
+        prefs.update(h.get("firefox_user_prefs", {}))
+        if "args" in h:
+            opts["args"] = h["args"]
+    if prefs:
+        opts["firefox_user_prefs"] = prefs
+    return opts
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--browser", default="chromium", choices=["chromium", "firefox", "webkit"])
@@ -49,20 +77,19 @@ def main():
     if args.hardened and HARDENED[args.browser] is None:
         print(f"{args.browser}: no hardening switches available; skipping"); return 2
     label = "+".join(["pwx"] + (["guard"] if args.guard else []) + (["hardened"] if args.hardened else []))
-    base = {"executable_path": args.executable} if args.executable else {}
     rows, phases, version = [], set(), ""
     with sync_playwright() as p:
         bt = getattr(p, args.browser)
-        control_browser = bt.launch(**base)
-        pwx_browser = bt.launch(**base, **HARDENED[args.browser]) if args.hardened else control_browser
+        control_browser = bt.launch(**launch_opts(args.browser, args.executable, False))
+        pwx_browser = (bt.launch(**launch_opts(args.browser, args.executable, True))
+                       if args.hardened else control_browser)
         version = control_browser.version
         q = "&guard=1" if args.guard else ""
         for mode in MODES:
             # Fresh contexts per run: no shared cache, service worker or connection pool.
-            cv, ctcp = run(control_browser.new_context().new_page(), f"http://127.0.0.1:8102/#{mode}")
-            page = pwx_browser.new_context().new_page()
-            xv, xtcp = run(page, f"{LOADER}/?pkg=evil&mode={mode}{q}", wait_s=7)
-            state = page.evaluate("() => window.__pwx") if not page.is_closed() else {}
+            cv, ctcp, _ = run(control_browser, f"http://127.0.0.1:8102/#{mode}")
+            xv, xtcp, state = run(pwx_browser, f"{LOADER}/?pkg=evil&mode={mode}{q}", wait_s=7)
+            state = state or {}
             phases.add(state.get("phase") if state else "navigated-away")
             tried = next((m["tried"] for m in (state or {}).get("messages", []) if m.get("type") == "evil-done"), None)
             names = (tried or []) if mode == "passive" else [mode]
@@ -73,7 +100,7 @@ def main():
                     c, x = v in cv, v in xv
                 result = "LEAK" if x else ("blocked" if c else "untested: control did not leak")
                 rows.append({"vector": v, "control": c, "pwx": x, "result": result})
-        dv, _ = run(pwx_browser.new_context().new_page(), f"{LOADER}/?pkg=declared&dev=1&mode=passive{q}", wait_s=7)
+        dv, _, _ = run(pwx_browser, f"{LOADER}/?pkg=declared&dev=1&mode=passive{q}", wait_s=7)
         if pwx_browser is not control_browser:
             pwx_browser.close()
         control_browser.close()

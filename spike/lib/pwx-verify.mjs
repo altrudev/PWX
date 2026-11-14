@@ -136,6 +136,8 @@ export function validateManifest(m, opts = {}) {
     need(typeof h === "string" && HASH_RE.test(h), `bad hash for ${p}`);
   }
   need(Object.hasOwn(m.files, m.entry), "entry is not a listed file");
+  need(m.runtime === undefined || ["standard", "strict"].includes(m.runtime), "bad runtime");
+  if (m.runtime === "strict") need(m.entry.endsWith(".js"), "strict entry must be a worker script");
   return m;
 }
 

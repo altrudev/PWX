@@ -47,6 +47,15 @@ http.createServer((req, res) => {
   }
   if (u.pathname === "/__pwx/bootstrap.js") return serveFile(res, join(ROOT, "app-origin"), "bootstrap.js");
   if (u.pathname === "/__pwx/guard.js") return serveFile(res, join(ROOT, "app-origin"), "guard.js");
+  if (u.pathname === "/__pwx/renderer.js") return serveFile(res, join(ROOT, "app-origin"), "renderer.js");
+  if (u.pathname === "/__pwx/strict-unsafe.html") {
+    return serveFile(res, join(ROOT, "app-origin"), "strict.html", { "Content-Security-Policy": `frame-ancestors ${LOADER}` });
+  }
+  if (u.pathname === "/__pwx/strict.html") {
+    return serveFile(res, join(ROOT, "app-origin"), "strict.html", {
+      "Content-Security-Policy": `default-src 'none'; script-src 'self'; worker-src 'self'; img-src blob:; style-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${LOADER}`,
+    });
+  }
   if (u.pathname === "/sw.js") return serveFile(res, join(ROOT, "app-origin"), "sw.js", { "Service-Worker-Allowed": "/" });
   res.writeHead(404, { "Content-Type": "text/plain" }).end("not served from network");
 }).listen(8101, "127.0.0.1");
