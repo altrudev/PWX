@@ -2,7 +2,7 @@ import { verifyPackage, buildHeaders, cmpVersion, PwxError } from "/lib/pwx-veri
 import { library } from "/store.mjs";
 
 const LOADER = location.origin;
-const APP = "http://127.0.0.1:8101"; // spike: one fixed app origin; v0 derives it from the app id
+const HOSTED_APP = "http://127.0.0.1:8101"; // hosted spike: one shared app origin
 const $ = (id) => document.getElementById(id);
 const state = (window.__pwx = { phase: "start", messages: [] });
 const status = (t, cls = "") => { $("status").textContent = t; $("status").className = cls; };
@@ -10,10 +10,26 @@ const params = new URLSearchParams(location.search);
 // Dev-only hook: accept http/ws loopback origins (spike tests). Never in a real loader.
 const dev = params.get("dev") === "1";
 
-// The loader keeps itself on the device, so installed apps open with no network.
-const loaderReady = "serviceWorker" in navigator
-  ? navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "all" }).then(() => navigator.serviceWorker.ready).catch(() => null)
-  : Promise.resolve(null);
+// A local loader (pwx-local) answers /__pwx/mode itself; the hosted loader's service worker
+// answers it on the device, so asking never reaches a remote host after the first visit.
+const modeReady = fetch("/__pwx/mode").then((r) => (r.ok ? r.json() : { local: false })).catch(() => ({ local: false }));
+// Hosted mode: the loader keeps itself on the device, so installed apps open with no network.
+// Local mode: the loader already lives on this machine, so no service worker is needed.
+const loaderReady = modeReady.then((m) => {
+  state.local = Boolean(m.local);
+  if (m.local || !("serviceWorker" in navigator)) return null;
+  return navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "all" })
+    .then(() => navigator.serviceWorker.ready).catch(() => null);
+});
+// Local mode gives every app its own origin (its own port), so apps can't share storage.
+async function appOrigin(id) {
+  if (!state.local) return HOSTED_APP;
+  const r = await fetch(`/__pwx/origin?id=${encodeURIComponent(id)}`);
+  if (!r.ok) throw new PwxError("loader", "no app origin");
+  const { origin, fresh } = await r.json();
+  if (fresh) { location.reload(); await new Promise(() => {}); }
+  return origin;
+}
 state.loaderReady = loaderReady.then((r) => { state.offlineReady = Boolean(r); });
 
 function describe(m) {
@@ -67,12 +83,14 @@ async function launch(id) {
   state.manifest = manifest;
   const headers = buildHeaders(manifest, LOADER);
   state.headers = headers;
+  const APP = await appOrigin(manifest.id);
+  state.appOrigin = APP;
   $("library").hidden = true;
   $("consent").hidden = false;
   $("consent").replaceChildren(...describe(manifest).map((line) => Object.assign(document.createElement("div"), { textContent: line })));
 
   status("Installing verified files on the app origin…");
-  const boot = Object.assign(document.createElement("iframe"), { className: "bootstrap", src: `${APP}/__pwx/bootstrap.html` });
+  const boot = Object.assign(document.createElement("iframe"), { className: "bootstrap", src: `${APP}/__pwx/bootstrap.html#loader=${encodeURIComponent(LOADER)}` });
   const booted = waitFor("bootstrap-ready", APP);
   $("stage").append(boot);
   await booted;

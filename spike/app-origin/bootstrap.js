@@ -1,6 +1,7 @@
 // Receives verified files from the loader and installs them into the app origin's cache.
 // Accepts messages only from the loader origin.
-const LOADER = "http://127.0.0.1:8100";
+const given = new URLSearchParams(location.hash.slice(1)).get("loader");
+const LOADER = /^(https:\/\/[a-z0-9.-]+(:\d+)?|http:\/\/127\.0\.0\.1:\d+)$/.test(given || "") ? given : "http://127.0.0.1:8100";
 const TYPES = { html: "text/html; charset=utf-8", js: "text/javascript", mjs: "text/javascript", css: "text/css", json: "application/json", wasm: "application/wasm", svg: "image/svg+xml", png: "image/png" };
 const ready = navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "all" }).then(() => navigator.serviceWorker.ready);
 

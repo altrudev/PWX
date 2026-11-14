@@ -12,6 +12,10 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET" || u.origin !== self.location.origin) return;
   // Installs and test hooks always go to the host; everything else is local first.
   if (u.pathname.startsWith("/packages/") || u.pathname.startsWith("/__test/")) return;
+  if (u.pathname === "/__pwx/mode") {
+    e.respondWith(new Response('{"local":false}', { headers: { "Content-Type": "application/json" } }));
+    return;
+  }
   e.respondWith((async () => {
     const key = e.request.mode === "navigate" ? "/" : e.request;
     const hit = await caches.match(key, { ignoreSearch: e.request.mode === "navigate", cacheName: CACHE });

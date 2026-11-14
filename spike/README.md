@@ -63,3 +63,16 @@ Run everything on a machine with all three Playwright browsers:
 python3 -m venv .venv && .venv/bin/pip install playwright && .venv/bin/python -m playwright install chromium firefox webkit
 npm test && bash tests/run_matrix.sh && bash tests/run_strict.sh && bash tests/run_notes.sh && bash tests/run_offline.sh
 ```
+
+## Local loader (Verified tier)
+
+`local/pwx-local.mjs` serves the loader and runtime from your own machine, on 127.0.0.1 only,
+after checking every file against a signed release (`local/release.json`). Each app gets its own
+origin. No web host is involved, so none can swap the verifier or see which apps you open.
+
+```bash
+node tools/make-release.mjs 0.1.0   # re-sign after changing lib/, loader/ or app-origin/ (key in packages/)
+node local/pwx-local.mjs add packages/notes.pwx.json
+node local/pwx-local.mjs serve      # then open http://127.0.0.1:7100/?pkg=notes
+bash tests/run_local.sh             # tamper check + all three engines
+```
