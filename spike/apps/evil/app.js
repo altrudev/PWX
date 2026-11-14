@@ -38,10 +38,26 @@ const passive = {
     pc.createDataChannel("x");
     await pc.setLocalDescription(await pc.createOffer());
   },
+  // Guard bypass attempt: a fresh same-origin realm reached through window[i], not contentWindow.
+  "webrtc-fresh-realm": async () => {
+    const f = document.createElement("iframe");
+    document.body.append(f);
+    const PC = window[window.length - 1].RTCPeerConnection;
+    const pc = new PC({ iceServers: [{ urls: "stun:127.0.0.1:3479" }] });
+    pc.createDataChannel("x");
+    await pc.setLocalDescription(await pc.createOffer());
+  },
+  // Worker: its own leak attempts report under worker-* paths.
+  "worker": () => new Worker("worker.js"),
 };
+const workerVectors = ["worker-fetch", "worker-xhr", "worker-websocket", "worker-eventsource",
+  "worker-importscripts", "worker-nested", "worker-webrtc"];
 // Connection-only vectors: no HTTP request is made, so the canary sees a TCP connection, not a path.
 const connectionOnly = {
   "link-preconnect": () => add(`<link rel="preconnect" href="${CANARY}">`),
+  "link-preconnect-dom": () => {
+    const l = document.createElement("link"); l.rel = "preconnect"; l.href = CANARY; document.head.append(l);
+  },
 };
 const navigating = {
   "window-open": () => window.open(url("window-open")),
@@ -56,9 +72,12 @@ const navigating = {
 const mode = location.hash.slice(1) || "passive";
 const run = (fn) => { try { const r = fn(); if (r && r.catch) r.catch(() => {}); } catch (_) {} };
 let tried;
-if (mode === "passive") { tried = Object.keys(passive); tried.forEach((k) => run(passive[k])); }
+if (mode === "passive") {
+  Object.keys(passive).forEach((k) => run(passive[k]));
+  tried = Object.keys(passive).filter((k) => k !== "worker").concat(workerVectors);
+}
 else if (connectionOnly[mode]) { tried = [mode]; run(connectionOnly[mode]); }
 else if (navigating[mode]) { tried = [mode]; }
 else { tried = []; }
-parent.postMessage({ type: "evil-done", mode, tried }, "*");
+setTimeout(() => parent.postMessage({ type: "evil-done", mode, tried }, "*"), 0);
 if (navigating[mode]) setTimeout(() => run(navigating[mode]), 300);

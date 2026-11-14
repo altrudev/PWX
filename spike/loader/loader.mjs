@@ -54,7 +54,8 @@ async function main() {
   $("stage").append(boot);
   await booted;
   const installed = waitFor("installed", APP);
-  boot.contentWindow.postMessage({ type: "install", files, headers }, APP);
+  const guard = params.get("guard") === "1";
+  boot.contentWindow.postMessage({ type: "install", files, headers, guard }, APP);
   await installed;
 
   status("Running app (sandboxed: no popups, no top navigation, no forms, no downloads).");

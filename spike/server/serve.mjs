@@ -46,6 +46,7 @@ http.createServer((req, res) => {
     });
   }
   if (u.pathname === "/__pwx/bootstrap.js") return serveFile(res, join(ROOT, "app-origin"), "bootstrap.js");
+  if (u.pathname === "/__pwx/guard.js") return serveFile(res, join(ROOT, "app-origin"), "guard.js");
   if (u.pathname === "/sw.js") return serveFile(res, join(ROOT, "app-origin"), "sw.js", { "Service-Worker-Allowed": "/" });
   res.writeHead(404, { "Content-Type": "text/plain" }).end("not served from network");
 }).listen(8101, "127.0.0.1");
@@ -68,8 +69,10 @@ canary.on("upgrade", (req, socket) => { record("websocket", req.url); socket.des
 canary.listen(8199, "127.0.0.1");
 
 // 3478/udp canary
-const udp = dgram.createSocket("udp4");
-udp.on("message", () => record("udp", "/leak/webrtc-stun"));
-udp.bind(3478, "127.0.0.1");
+for (const [port, name] of [[3478, "webrtc-stun"], [3479, "webrtc-fresh-realm"], [3480, "worker-webrtc"]]) {
+  const udp = dgram.createSocket("udp4");
+  udp.on("message", () => record("udp", `/leak/${name}`));
+  udp.bind(port, "127.0.0.1");
+}
 
-console.log("PWX spike servers up: loader :8100, app :8101, control :8102, canary :8199 + udp/3478");
+console.log("PWX spike servers up: loader :8100, app :8101, control :8102, canary :8199 + udp/3478-3480");

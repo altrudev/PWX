@@ -10,8 +10,17 @@ addEventListener("message", async (e) => {
     await ready;
     await caches.delete("pwx-verified");
     const cache = await caches.open("pwx-verified");
-    for (const [path, bytes] of Object.entries(e.data.files)) {
+    const GUARD = '<script src="/__pwx/guard.js"></script>';
+    for (const [path, raw] of Object.entries(e.data.files)) {
       const ext = path.split(".").pop();
+      // Optional guard: loader code placed ahead of the verified bytes, which are unchanged.
+      let bytes = raw;
+      if (e.data.guard && ext === "html") {
+        const text = new TextDecoder().decode(raw);
+        const at = text.search(/<head[^>]*>/i);
+        const cut = at < 0 ? 0 : at + text.slice(at).indexOf(">") + 1;
+        bytes = new TextEncoder().encode(text.slice(0, cut) + GUARD + text.slice(cut));
+      }
       await cache.put("/" + path, new Response(bytes, {
         headers: { ...e.data.headers, "Content-Type": TYPES[ext] ?? "application/octet-stream" },
       }));
