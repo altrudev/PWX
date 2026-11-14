@@ -11,14 +11,18 @@
   if (!/^app\/[A-Za-z0-9._/-]+\.js$/.test(entry || "")) return;
 
   const TAGS = new Set(["div", "p", "span", "h1", "h2", "h3", "ul", "ol", "li", "button",
-    "input", "label", "strong", "em", "img", "section", "header", "footer"]);
-  const ATTRS = new Set(["class", "id", "type", "value", "placeholder", "alt", "title", "disabled", "checked"]);
+    "input", "label", "strong", "em", "img", "section", "header", "footer",
+    "textarea", "nav", "aside", "main", "article", "small"]);
+  const ATTRS = new Set(["class", "id", "type", "value", "placeholder", "alt", "title", "disabled",
+    "checked", "rows", "maxlength", "aria-label", "aria-current", "spellcheck"]);
+  const PROPS = new Set(["value", "checked", "disabled"]);
   const EVENTS = new Set(["click", "input", "change", "keydown"]);
   // Node 0 is the body. Resolved at use time: this script runs in <head>, before <body> exists.
   const nodes = new Map();
   const node = (id) => (id === 0 ? document.body : nodes.get(id));
   const rejected = [];
   const reject = (op, why) => rejected.push(`${op.t}:${why}:${String(op.tag || op.name || "")}`);
+  window.__pwxRejected = rejected; // test visibility; no app code runs in this document
   const worker = new Worker("/" + entry);
 
   function apply(op) {
@@ -38,12 +42,21 @@
         return n.setAttribute(name, value);
       }
       case "text": { const n = nodes.get(op.id); if (n) n.textContent = String(op.value); return; }
+      case "prop": {
+        const n = nodes.get(op.id), name = String(op.name);
+        if (!n || !PROPS.has(name)) return reject(op, "prop");
+        n[name] = name === "value" ? String(op.value) : Boolean(op.value);
+        return;
+      }
+      case "focus": { const n = nodes.get(op.id); if (n && n.focus) n.focus(); return; }
       case "append": { const a = node(op.parent), c = node(op.id); if (a && c) a.append(c); return; }
       case "remove": { const n = nodes.get(op.id); if (n) n.remove(); nodes.delete(op.id); return; }
       case "listen": {
         const n = nodes.get(op.id), type = String(op.type);
         if (!n || !EVENTS.has(type)) return reject(op, "event");
-        n.addEventListener(type, (e) => worker.postMessage({ t: "event", id: op.id, type, value: e.target.value ?? null }));
+        n.addEventListener(type, (e) => worker.postMessage({
+          t: "event", id: op.id, type, value: e.target.value ?? null, key: e.key ?? null,
+        }));
         return;
       }
       default: return reject(op || {}, "op");

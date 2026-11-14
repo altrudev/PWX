@@ -12,9 +12,11 @@ function describe(m) {
   return [
     `${m.name ?? m.id} ${m.version}`,
     hosts.length ? `Can send data to: ${hosts.join(", ")}` : "Cannot send data to any host.",
-    // Spike finding (Chrome 153): CSP "webrtc 'block'" is not enforced, so a WebRTC
-    // STUN request still reaches undeclared hosts. Say so instead of overclaiming.
-    "Warning: this browser does not yet block WebRTC, so the app could still reach other hosts that way.",
+    // Spike finding: no engine enforces CSP "webrtc 'block'" for pages, and WebKit also
+    // lets preconnect through. Strict apps run only in a worker, so neither applies.
+    m.runtime === "strict"
+      ? "Strict runtime: app code runs in a worker and can't touch the page, open connections from it, or use WebRTC."
+      : "Warning: this browser can't fully block WebRTC (or preconnect, in Safari) for this app, so it could still reach other hosts that way.",
     ...["camera", "microphone", "location", "notifications"].filter((k) => c[k]).map((k) => `Can use ${k}`),
   ];
 }

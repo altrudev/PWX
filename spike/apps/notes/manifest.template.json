@@ -1,0 +1,12 @@
+{
+  "pwx": "0",
+  "id": "org.example.notes",
+  "name": "Notes",
+  "version": "1.0.0",
+  "runtime": "strict",
+  "entry": "app/main.js",
+  "capabilities": {
+    "network": { "connect": [], "webrtc": "none" },
+    "storage": { "local": true, "persistent": true }
+  }
+}
