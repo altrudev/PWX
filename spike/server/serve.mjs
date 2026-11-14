@@ -16,6 +16,7 @@ const LOADER = "http://127.0.0.1:8100", APP = "http://127.0.0.1:8101";
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json", ".css": "text/css" };
 
 const hits = []; let tcp = 0;
+const served = []; // requests that reached the loader or app host (not test hooks)
 const record = (kind, path) => hits.push({ kind, path, at: Date.now() });
 
 function serveFile(res, base, rel, headers = {}) {
@@ -29,10 +30,13 @@ function serveFile(res, base, rel, headers = {}) {
 http.createServer((req, res) => {
   const u = new URL(req.url, LOADER);
   if (u.pathname === "/__test/hits") { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ hits, tcp })); }
-  if (u.pathname === "/__test/reset") { hits.length = 0; tcp = 0; return res.writeHead(204).end(); }
+  if (u.pathname === "/__test/reset") { hits.length = 0; tcp = 0; served.length = 0; return res.writeHead(204).end(); }
+  if (u.pathname === "/__test/served") { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify(served)); }
+  served.push(`loader ${u.pathname}`);
   const csp = `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src ${APP}; object-src 'none'; base-uri 'none'; form-action 'none'`;
   if (u.pathname === "/" ) return serveFile(res, join(ROOT, "loader"), "index.html", { "Content-Security-Policy": csp });
   if (u.pathname.startsWith("/lib/")) return serveFile(res, join(ROOT, "lib"), u.pathname.slice(5));
+  if (u.pathname === "/sw.js") return serveFile(res, join(ROOT, "loader"), "sw.js", { "Cache-Control": "max-age=86400" });
   if (u.pathname.startsWith("/packages/")) return serveFile(res, join(ROOT, "packages"), u.pathname.slice(10));
   return serveFile(res, join(ROOT, "loader"), u.pathname.slice(1), { "Content-Security-Policy": csp });
 }).listen(8100, "127.0.0.1");
@@ -40,6 +44,7 @@ http.createServer((req, res) => {
 // 8101 app origin: only the bootstrap and the service worker are ever served from the network.
 http.createServer((req, res) => {
   const u = new URL(req.url, APP);
+  served.push(`app ${u.pathname}`);
   if (u.pathname === "/__pwx/bootstrap.html") {
     return serveFile(res, join(ROOT, "app-origin"), "bootstrap.html", {
       "Content-Security-Policy": `default-src 'self'; script-src 'self'; frame-ancestors ${LOADER}`,
@@ -57,7 +62,7 @@ http.createServer((req, res) => {
       "Content-Security-Policy": `default-src 'none'; script-src 'self'; worker-src 'self'; img-src blob:; style-src 'self'; font-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${LOADER}`,
     });
   }
-  if (u.pathname === "/sw.js") return serveFile(res, join(ROOT, "app-origin"), "sw.js", { "Service-Worker-Allowed": "/" });
+  if (u.pathname === "/sw.js") return serveFile(res, join(ROOT, "app-origin"), "sw.js", { "Service-Worker-Allowed": "/", "Cache-Control": "max-age=86400" });
   res.writeHead(404, { "Content-Type": "text/plain" }).end("not served from network");
 }).listen(8101, "127.0.0.1");
 

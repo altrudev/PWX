@@ -1,10 +1,20 @@
-import { verifyPackage, buildHeaders, PwxError } from "/lib/pwx-verify.mjs";
+import { verifyPackage, buildHeaders, cmpVersion, PwxError } from "/lib/pwx-verify.mjs";
+import { library } from "/store.mjs";
 
 const LOADER = location.origin;
 const APP = "http://127.0.0.1:8101"; // spike: one fixed app origin; v0 derives it from the app id
 const $ = (id) => document.getElementById(id);
 const state = (window.__pwx = { phase: "start", messages: [] });
 const status = (t, cls = "") => { $("status").textContent = t; $("status").className = cls; };
+const params = new URLSearchParams(location.search);
+// Dev-only hook: accept http/ws loopback origins (spike tests). Never in a real loader.
+const dev = params.get("dev") === "1";
+
+// The loader keeps itself on the device, so installed apps open with no network.
+const loaderReady = "serviceWorker" in navigator
+  ? navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "all" }).then(() => navigator.serviceWorker.ready).catch(() => null)
+  : Promise.resolve(null);
+state.loaderReady = loaderReady.then((r) => { state.offlineReady = Boolean(r); });
 
 function describe(m) {
   const c = m.capabilities ?? {};
@@ -32,21 +42,32 @@ function waitFor(type, from) {
   });
 }
 
-async function main() {
-  const params = new URLSearchParams(location.search);
-  const name = params.get("pkg");
+// Install: verify, then keep the signed package locally. The first install pins the
+// publisher key; later versions must come from the same key and never go backwards.
+async function install(text) {
+  const { manifest } = await verifyPackage(text, { allowLoopbackHttp: dev });
+  const existing = await library.get(manifest.id);
+  if (existing && existing.publisher !== manifest.publisher) throw new PwxError("signature", "publisher changed");
+  if (existing && cmpVersion(manifest.version, existing.version) < 0) {
+    throw new PwxError("rollback", `${manifest.version} is older than installed ${existing.version}`);
+  }
+  await library.put({ id: manifest.id, name: manifest.name ?? manifest.id, version: manifest.version,
+    publisher: manifest.publisher, runtime: manifest.runtime ?? "standard", text, installedAt: Date.now() });
+  return manifest.id;
+}
+
+// Launch: re-verify the stored package from scratch every time, offline, then run it.
+async function launch(id) {
   const mode = params.get("mode") ?? ""; // test hook: passed to the app as #fragment (not part of any hash)
   if (!/^[a-z-]*$/.test(mode)) throw new PwxError("loader", "bad mode");
-  if (!/^[a-z0-9-]+$/.test(name ?? "")) throw new PwxError("loader", "missing or bad ?pkg=");
-  status("Verifying package…");
-  const text = await (await fetch(`/packages/${name}.pwx.json`)).text();
-  // Dev-only hook: accept http/ws loopback origins (spike tests). Never in a real loader.
-  const dev = params.get("dev") === "1";
-  const { manifest, files } = await verifyPackage(text, { allowLoopbackHttp: dev });
+  const record = await library.get(id);
+  if (!record) throw new PwxError("loader", `${id} is not installed`);
+  status("Verifying installed package…");
+  const { manifest, files } = await verifyPackage(record.text, { allowLoopbackHttp: dev, trustedPublisher: record.publisher });
   state.manifest = manifest;
   const headers = buildHeaders(manifest, LOADER);
   state.headers = headers;
-
+  $("library").hidden = true;
   $("consent").hidden = false;
   $("consent").replaceChildren(...describe(manifest).map((line) => Object.assign(document.createElement("div"), { textContent: line })));
 
@@ -56,8 +77,7 @@ async function main() {
   $("stage").append(boot);
   await booted;
   const installed = waitFor("installed", APP);
-  const guard = params.get("guard") === "1";
-  boot.contentWindow.postMessage({ type: "install", files, headers, guard }, APP);
+  boot.contentWindow.postMessage({ type: "install", files, headers, guard: params.get("guard") === "1" }, APP);
   await installed;
 
   status("Running app (sandboxed: no popups, no top navigation, no forms, no downloads).");
@@ -74,6 +94,57 @@ async function main() {
   }
   $("stage").append(app);
   state.phase = "running";
+}
+
+// Library: installed apps, all local. Opening one makes no network request.
+async function showLibrary() {
+  const apps = (await library.list()).sort((a, b) => a.name.localeCompare(b.name));
+  const list = $("apps");
+  list.replaceChildren(...apps.map((r) => {
+    const li = document.createElement("li");
+    const name = Object.assign(document.createElement("strong"), { textContent: `${r.name} ${r.version}` });
+    const meta = Object.assign(document.createElement("span"), { className: "meta", textContent: ` ${r.runtime} runtime` });
+    const open = Object.assign(document.createElement("a"), { className: "btn", textContent: "Open", href: `/?open=${encodeURIComponent(r.id)}${dev ? "&dev=1" : ""}` });
+    open.setAttribute("aria-label", `Open ${r.name}`);
+    const del = Object.assign(document.createElement("button"), { className: "btn", textContent: "Remove", type: "button" });
+    del.setAttribute("aria-label", `Remove ${r.name}`);
+    del.addEventListener("click", async () => { await library.remove(r.id); showLibrary(); });
+    li.append(name, meta, " ", open, " ", del);
+    return li;
+  }));
+  $("empty").hidden = apps.length > 0;
+  $("library").hidden = false;
+  status(apps.length ? "Your apps. They open without any network connection." : "No apps installed yet.");
+  state.phase = "library";
+  state.apps = apps.map((r) => r.id);
+}
+
+// Sideload: install a .pwx file from disk. Same verification as any install.
+$("file").addEventListener("change", async (e) => {
+  const file = e.target.files?.[0]; if (!file) return;
+  try {
+    const id = await install(await file.text());
+    await showLibrary();
+    status(`Installed ${id} from a file.`);
+  } catch (err) {
+    state.error = err.code ?? "error";
+    status(`Rejected: ${err.message}`, "error");
+  }
+  e.target.value = "";
+});
+
+async function main() {
+  await loaderReady;
+  const name = params.get("pkg"), open = params.get("open");
+  if (name) {
+    if (!/^[a-z0-9-]+$/.test(name)) throw new PwxError("loader", "bad ?pkg=");
+    status("Downloading and verifying package…");
+    const res = await fetch(`/packages/${name}.pwx.json`);
+    if (!res.ok) throw new PwxError("loader", `download failed (${res.status})`);
+    return launch(await install(await res.text()));
+  }
+  if (open) return launch(open);
+  return showLibrary();
 }
 
 main().catch((err) => {

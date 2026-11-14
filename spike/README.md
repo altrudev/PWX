@@ -46,3 +46,20 @@ declared-host run confirms that declared hosts still work.
 
 Firefox and Safari (WebKit) haven't been run yet; their browser downloads weren't available
 in the environment this was built in.
+
+## Later additions
+
+- **Strict runtime** (`app-origin/renderer.js`, `strict.html`, `ui.css`): app code runs only in a
+  worker and draws through a loader-owned renderer. `tests/run_strict.sh`.
+- **Notes** (`apps/notes`): first real app on the Strict runtime. `tests/run_notes.sh`.
+- **Offline-first loader** (`loader/sw.js`, `loader/store.mjs`, `app-origin/sw.js`): installed
+  apps open with no network, are re-verified at every launch, and can be sideloaded from a file.
+  `tests/run_offline.sh` shuts the host down and takes the browser offline.
+- **Full leak matrix**: `tests/run_matrix.sh` (Standard runtime, with and without guard and hardening).
+
+Run everything on a machine with all three Playwright browsers:
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install playwright && .venv/bin/python -m playwright install chromium firefox webkit
+npm test && bash tests/run_matrix.sh && bash tests/run_strict.sh && bash tests/run_notes.sh && bash tests/run_offline.sh
+```

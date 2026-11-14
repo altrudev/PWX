@@ -4,6 +4,13 @@
 <body>
 <header><strong>PWX loader</strong> <span class="tier">Host-verified tier: this loader comes from its web host and can be swapped by it.</span></header>
 <section id="status">Starting…</section>
+<section id="library" hidden>
+  <h2>Your apps</h2>
+  <ul id="apps"></ul>
+  <p id="empty" hidden>Nothing installed yet.</p>
+  <label class="btn" for="file">Install from a .pwx file</label>
+  <input id="file" type="file" accept=".json,.pwx,application/json">
+</section>
 <section id="consent" hidden></section>
 <div id="stage"></div>
 <script type="module" src="/loader.mjs"></script>

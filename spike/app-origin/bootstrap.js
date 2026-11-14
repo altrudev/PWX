@@ -2,7 +2,7 @@
 // Accepts messages only from the loader origin.
 const LOADER = "http://127.0.0.1:8100";
 const TYPES = { html: "text/html; charset=utf-8", js: "text/javascript", mjs: "text/javascript", css: "text/css", json: "application/json", wasm: "application/wasm", svg: "image/svg+xml", png: "image/png" };
-const ready = navigator.serviceWorker.register("/sw.js", { scope: "/" }).then(() => navigator.serviceWorker.ready);
+const ready = navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "all" }).then(() => navigator.serviceWorker.ready);
 
 addEventListener("message", async (e) => {
   if (e.origin !== LOADER || e.data?.type !== "install") return;
