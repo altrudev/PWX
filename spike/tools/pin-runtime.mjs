@@ -10,6 +10,7 @@ import { sha256, b64 } from "../lib/pwx-verify.mjs";
 
 const ROOT = join(fileURLToPath(import.meta.url), "../..");
 const FILES = { "/__pwx/bootstrap.html": "bootstrap.html", "/__pwx/bootstrap.js": "bootstrap.js",
+  "/__pwx/verify.mjs": "../lib/pwx-verify.mjs",
   "/__pwx/strict.html": "strict.html", "/__pwx/renderer.js": "renderer.js",
   "/__pwx/guard.js": "guard.js", "/__pwx/ui.css": "ui.css" };
 const pinned = {};

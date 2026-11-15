@@ -90,15 +90,35 @@ async function checkServiceWorkerChange() {
       return;
     }
     state.swChange = "unsigned";
-    updateMsg("Warning: the host changed the loader's service worker, and no signed release matches it. " +
-      "The host may be compromised. Your apps' data stays on their own origins, but avoid installing or updating until this is explained.", "error");
-  } catch (err) { state.swChange = "error"; }
-  $("loader-update").hidden = false;
+    lockdown();
+  } catch (err) { if (!state.swChange) state.swChange = "error"; }
+}
+// Lockdown: this page is still the verified loader, but the browser has accepted a service
+// worker that no signed release matches. From here this page opens, installs, updates and
+// removes nothing. It can't stop the replaced worker from serving the next page load, so it
+// says so plainly.
+function lockdown() {
+  if (state.locked) return;
+  state.locked = true;
+  for (const id of ["library", "consent", "loader-update"]) $(id).hidden = true;
+  for (const f of document.querySelectorAll("iframe.bootstrap")) f.remove();
+  for (const el of document.querySelectorAll("button, input, a.btn")) { el.disabled = true; el.removeAttribute("href"); }
+  const lines = [
+    "PWX locked this loader.",
+    "The host replaced the loader's service worker with one that no signed PWX release matches. The host may be compromised.",
+    "Since then this page has opened, installed, updated and removed nothing. Your apps' data is still on this device, and each app's origin accepts only correctly signed packages from that app's own publisher.",
+    "What to do: close this tab, and don't open this loader again until its operator explains the change. If you reopen it, the replaced loader will be running and this warning may not appear again.",
+  ];
+  $("lock").replaceChildren(...lines.map((t, i) => Object.assign(document.createElement(i ? "p" : "h2"), { textContent: t })));
+  $("lock").hidden = false;
+  status("Locked: the loader's service worker was replaced without a signed release.", "error");
 }
 loaderReady.then((reg) => {
   if (!reg) return;
   reg.addEventListener("updatefound", () => {
     const w = reg.installing;
+    // Check as soon as the new worker exists, and again once it has taken over.
+    checkServiceWorkerChange();
     w?.addEventListener("statechange", () => { if (w.state === "activated") checkServiceWorkerChange(); });
   });
   showLoaderVersion();
@@ -181,6 +201,7 @@ function waitFor(type, from) {
 // publisher key; later versions must come from the same key, never go backwards, and a
 // version number can't be reused for different content.
 async function install(text) {
+  if (state.locked) throw new PwxError("loader", "this loader is locked");
   const { manifest } = await verifyPackage(text, { allowLoopbackHttp: dev });
   const hash = await manifestHash(manifest);
   const existing = await library.get(manifest.id);
@@ -205,7 +226,8 @@ async function launch(id) {
   const record = await library.get(id);
   if (!record) throw new PwxError("loader", `${id} is not installed`);
   status("Verifying installed package…");
-  const { manifest, files } = await verifyPackage(record.text, { allowLoopbackHttp: dev, trustedPublisher: record.publisher });
+  if (state.locked) throw new PwxError("loader", "this loader is locked");
+  const { manifest } = await verifyPackage(record.text, { allowLoopbackHttp: dev, trustedPublisher: record.publisher });
   state.manifest = manifest;
   const headers = buildHeaders(manifest, LOADER);
   state.headers = headers;
@@ -215,7 +237,8 @@ async function launch(id) {
   showLines(describe(manifest, await fingerprint(manifest.publisher)));
 
   status("Installing verified files on the app origin…");
-  await bootstrapCall(APP, { type: "install", files, headers, guard }, "installed", "install-failed");
+  // The app origin verifies the package again itself; it doesn't take files or headers from here.
+  await bootstrapCall(APP, { type: "install", text: record.text, dev, guard }, "installed", "install-failed");
 
   status("Running app (sandboxed: no popups, no top navigation, no forms, no downloads).");
   addEventListener("message", (e) => { if (e.origin === APP) state.messages.push(e.data); });
@@ -253,6 +276,7 @@ async function bootstrapCall(APP, msg, ok, failed, { keep = true } = {}) {
 // Remove: wipe the app's origin first, then forget the app. If the wipe fails the app stays
 // installed, so its origin is never handed to another app with data still in it.
 async function removeApp(r) {
+  if (state.locked) throw new PwxError("loader", "this loader is locked");
   status(`Removing ${r.name} and its data…`);
   const APP = await appOrigin(r.id, r);
   await bootstrapCall(APP, { type: "wipe" }, "wiped", "wipe-failed", { keep: false });

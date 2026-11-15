@@ -1,26 +1,26 @@
 {
   "release": {
-    "version": "0.3.0",
+    "version": "0.4.0",
     "files": {
       "lib/pwx-verify.mjs": "sha256-aa8/zzV5qd7rZU3ty/noG6kEvDOk29FHfm5n/egJ2DE=",
       "loader/config.mjs": "sha256-FH5HOSfUtpjJVm+UNxQxNtkwGGvd7LSqB+aHZPKjWMU=",
-      "loader/index.html": "sha256-OPlZ+5gQArE2uUMLaD/JgOPf5WfgbI8KKVs9bJV059U=",
-      "loader/loader.css": "sha256-X0yeI8jmXHJqt4so6Nzmr4Fi3lhi0pGNzCnAeGeqwnI=",
-      "loader/loader.mjs": "sha256-Q8orA0XoWY/clGw7AYOoBzy5ldps0lAltazx69/QJCA=",
+      "loader/index.html": "sha256-T/+tRso5FONIcj1KkAMImidy1IzUGV1sYl7/0oqhn2o=",
+      "loader/loader.css": "sha256-DszeTH/OQTjKIiSlD07zeQt7QaRmntKl1/y0mwQUQ18=",
+      "loader/loader.mjs": "sha256-QaWRZ/E3dIGOYdXpvjQmmFjrZWMDlVkGxxWn/mTUeug=",
       "loader/store.mjs": "sha256-DllHipesS1CtUbSKG86w2h7IjANw3xqsejvK4a1zMA8=",
       "loader/sw.js": "sha256-z/1xkYgBu34CiaZnBh+TGp9rauiGpgbrr0U3SsxyZOU=",
       "app-origin/bootstrap.html": "sha256-9JrT65ViQ0oqbSFmzplt36pXf3XbXBoIDwKedw2D+v0=",
-      "app-origin/bootstrap.js": "sha256-klCmLaVn6xckiKTkPkUo2/mxymtXL++tzIFGn/z9i4I=",
+      "app-origin/bootstrap.js": "sha256-mPhQqVMmtrtDRLFzHNLC04Io0tTZLwhzahOVfkR+2NU=",
       "app-origin/guard.js": "sha256-T5G742sbqECNwXC5VeaEMRdp6J5JL0nRwNQrr3474YI=",
       "app-origin/renderer.js": "sha256-ROxnSPFpYIq24Vtmlo1EUhnS5nUwpt2NahCEeOKQbOU=",
       "app-origin/strict.html": "sha256-uGg0JedU1IFHz3RYE0kPVzdLwjEZw5vw1MkDMV1UVYE=",
-      "app-origin/sw.js": "sha256-dh8CGbm01WCwok8T2nsYmEkb4+gufePtn15XgkJR7qs=",
+      "app-origin/sw.js": "sha256-ZBQgH4ii1Yv/SKcTNv/AMF9J0Us3VkY/QSES7YDKcqA=",
       "app-origin/ui.css": "sha256-pwAlPyW8ZnERztqY6NLPsZMz89x6BBjG34LjRZ61jPw="
     }
   },
   "sig": {
     "alg": "ed25519",
     "key": "YuCRSgEJ89t+8Xn8AOqQcxz2zk+hNMpI1R61VA1OStY=",
-    "sig": "I6udeIU2YmOwaf72BAKOI8EWeLSY8jGOSz2jNFRzMMlbuYNZLvRJ39REBlOp+srzdeBnH7mzYq2rrXWBkRtGDg=="
+    "sig": "EUZyYhIklqRQDg6YkxcS/1J3SARKC8zTSotW3VKyMmA6gQ99+4Q6EPvXyQcqjPdyElLKY4cNHUeqh4RDHV/FDA=="
   }
 }

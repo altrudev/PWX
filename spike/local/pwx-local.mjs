@@ -62,9 +62,9 @@ function sendFile(res, bundle, path, headers = {}) {
 }
 
 function appServer(bundle, port) {
-  const RUNTIME = { "/__pwx/bootstrap.js": "app-origin/bootstrap.js", "/__pwx/guard.js": "app-origin/guard.js",
+  const RUNTIME = { "/__pwx/bootstrap.js": "app-origin/bootstrap.js", "/__pwx/guard.js": "app-origin/guard.js", "/__pwx/verify.mjs": "lib/pwx-verify.mjs",
     "/__pwx/renderer.js": "app-origin/renderer.js", "/__pwx/ui.css": "app-origin/ui.css" };
-  const sw = new TextEncoder().encode(new TextDecoder().decode(bundle.files.get("app-origin/sw.js")).replace("__PWX_LOADER_ORIGIN__", LOADER));
+  const sw = new TextEncoder().encode(new TextDecoder().decode(bundle.files.get("app-origin/sw.js")).replace("__PWX_LOADER_ORIGIN__", LOADER).replace("__PWX_TEST__", "0"));
   return http.createServer((req, res) => {
     if (!hostOk(req, port)) return send(res, 421, "wrong host");
     const u = new URL(req.url, `http://${HOSTNAME}:${port}`);

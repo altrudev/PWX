@@ -111,8 +111,14 @@ The loader installs, keeps and launches apps.
   capabilities and a short **publisher fingerprint**. Nothing installs without a click.
 - **Sideloading:** a `.pwx` file from disk installs through the same verification and consent.
 - **Bootstrap:** the loader frames the app origin's `/__pwx/bootstrap.html` and hands it a
-  `MessageChannel` port. The bootstrap accepts files only on that port, writes them into the
-  `pwx-verified` cache with their CSP headers, and does nothing when opened as a tab.
+  `MessageChannel` port and the signed package. The app origin doesn't trust the loader: the
+  bootstrap verifies the signature and every file itself, computes the CSP itself, and keeps the
+  origin's own pin (app id, publisher key, version, manifest hash). It refuses raw files, another
+  publisher, an older version, a same-version swap and any other app's package. It writes the
+  verified files into the `pwx-verified` cache and does nothing when opened as a tab.
+- **Lockdown:** if the browser accepts a loader `sw.js` that no signed release matches, the
+  running loader page locks: it opens, installs, updates and removes nothing, and tells the user
+  not to reopen the loader.
 - **Test switches** (`dev`, `mode`, `guard`, `unsafe`) work only when the server ships a test
   config (`TEST=true` under `PWX_TEST=1`). Production and pwx-local ship `TEST=false`.
 
@@ -201,7 +207,8 @@ and per-app origins from the user's own machine.
 | A modified pwx-local install | signed release self-check | blocked |
 | A changed or partial hosted loader (cache or host) | signed release, every file checked on every serve | blocked (AUDIT M6) |
 | A rolled-back or swapped loader update | version must increase; same-version swap refused; updates only on click | blocked (AUDIT M6) |
-| A compromised host replaces the loader's `sw.js` | warning when no signed release matches | **browser limit**: detectable, not preventable in the hosted tier; use pwx-local |
+| A compromised host replaces the loader's `sw.js` | the running page locks down; app origins verify packages themselves and pin id, publisher and version | **reduced, not closed**: the replaced loader can't install forged or older app code, but can request a wipe; use pwx-local |
+| A compromised host replaces an app origin's `sw.js` | none in the hosted tier | **open (browser limit)**: needs a check outside the host (pwx-local, an extension, or signed bundles) |
 
 ## 9. Not implemented yet
 

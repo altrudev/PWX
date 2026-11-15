@@ -121,6 +121,7 @@ const appHandler = (req, res) => {
     });
   }
   if (u.pathname === "/__pwx/bootstrap.js") return serveFile(res, join(ROOT, "app-origin"), "bootstrap.js");
+  if (u.pathname === "/__pwx/verify.mjs") return serveFile(res, join(ROOT, "lib"), "pwx-verify.mjs");
   if (u.pathname === "/__pwx/guard.js") return serveFile(res, join(ROOT, "app-origin"), "guard.js");
   if (u.pathname === "/__pwx/renderer.js") return serveFile(res, join(ROOT, "app-origin"), "renderer.js");
   if (u.pathname === "/__pwx/ui.css") return serveFile(res, join(ROOT, "app-origin"), "ui.css");
@@ -133,7 +134,7 @@ const appHandler = (req, res) => {
     });
   }
   if (u.pathname === "/sw.js") {
-    const sw = readFileSync(join(ROOT, "app-origin/sw.js"), "utf8").replace("__PWX_LOADER_ORIGIN__", LOADER);
+    const sw = readFileSync(join(ROOT, "app-origin/sw.js"), "utf8").replace("__PWX_LOADER_ORIGIN__", LOADER).replace("__PWX_TEST__", TEST ? "1" : "0");
     res.writeHead(200, { "Content-Type": "text/javascript", "Service-Worker-Allowed": "/", "Cache-Control": "max-age=86400" });
     return res.end(sw);
   }

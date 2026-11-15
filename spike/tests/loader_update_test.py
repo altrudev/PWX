@@ -89,6 +89,12 @@ def main():
                 got = pg.evaluate("() => window.__pwx.swChange")
                 note = pg.locator("#update-msg").inner_text()
                 check(f"sw.js change, release={release}: {expected}", got == expected, f"{got}: {note[:70]}")
+                locked = pg.evaluate("() => Boolean(window.__pwx.locked)")
+                if expected == "unsigned":
+                    shut = pg.locator("#lock").is_visible() and not pg.locator("#library").is_visible()
+                    check("unsigned sw.js: loader locks down", locked and shut)
+                else:
+                    check("signed sw.js: no lockdown", not locked)
                 c.close()
             host(release="normal", sw="normal", swcache=1)
             b.close()

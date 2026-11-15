@@ -7,7 +7,7 @@ M4 remains open (see [Open](#open)).
 
 | | |
 | --- | --- |
-| Code | branch `spike`: `03b3b65` (Stage 1), `25b2621` (Stage 2), `20b1797` (L3), M6 fix (this commit) |
+| Code | branch `spike`: `03b3b65` (Stage 1), `25b2621` (Stage 2), `20b1797` (L3), `38b6769` (M6), host-compromise layers (this commit) |
 | Engines | Chromium 159.0.8154.6, Firefox 159.0, WebKit 27.2 (Playwright, headless) |
 | Harness | audit harness on the test VPS: `run.sh` runs static checks, then `exploits.py` in each engine |
 | Spec | [`SPEC.md`](SPEC.md) |
@@ -156,6 +156,45 @@ Firefox and WebKit:
 | Change `sw.js` with no matching signed release | warning shown |
 | Change `sw.js` along with a matching signed release | no warning; update offered |
 
+## Surviving a compromised host (hosted tier)
+
+M6 left one thing a web page can't prevent: the browser itself fetches the loader's `sw.js` from
+the host and installs it. Neither the page nor the current worker can veto that, a new worker
+can activate at once and discard the old one, and unregistering it only hands the next page load
+to the same host. So the hosted tier can't block or quarantine a replaced worker. Two layers now
+limit what a replaced loader can do:
+
+1. **Lockdown.** When a swap happens, the verified loader page is still running: the browser
+   loads it from the old worker first, then checks for a new one. If the new `sw.js` matches no
+   signed release, the page locks: it hides the library, removes its bootstrap frames, disables
+   every control, refuses to open, install, update or remove anything, and tells the user to
+   close the tab and not reopen the loader. This holds for that page only; the next page load
+   comes from the replaced worker.
+2. **App origins don't trust the loader.** The bootstrap used to accept files and headers from
+   the loader as given. Now the loader hands over the signed package, and the app origin verifies
+   the signature and every file hash itself (`/__pwx/verify.mjs`, pinned by hash in the app
+   origin's service worker), computes the CSP itself, and keeps its own pin: app id, publisher
+   key, version and manifest hash. It refuses raw files, another publisher's signature, a changed
+   file, an older version, a same-version swap, and any other app's package. Test switches are
+   honoured only if the origin's own service worker says it's a test build. So a replaced loader
+   can only install a genuine package from the app's own publisher, and a genuine Strict app
+   can't send data anywhere.
+
+**Proof:** `tests/bootstrap_trust_test.py` runs script on the loader's own origin (what a
+replaced loader would be) against the Notes origin: 6 pushes refused, Notes and its note intact,
+and a genuine newer version accepted; 9/9 in each engine. `tests/loader_update_test.py` now also
+checks the lockdown (15 checks).
+
+**Still open in the hosted tier:**
+
+- A replaced loader can still ask an app origin to **wipe** (data loss, not theft). Fix: the app
+  origin asks the user itself, in its own frame, before erasing.
+- In hosted mode the app origins are served by the same host, so a fully compromised host can
+  replace **their** service workers too and read app data directly. Layer 2 doesn't cover that.
+- A real quarantine needs a check outside the host: `pwx-local` (exists), a browser extension
+  that blocks `sw.js` until it matches a signed release (to be spiked), or browser-verified
+  signed bundles.
+
 ## Test results after Stage 2
 
 | Suite | Chromium | Firefox | WebKit |
@@ -165,7 +204,8 @@ Firefox and WebKit:
 | Notes (includes the L3 test) | 9/9 | 9/9 | 9/9 |
 | Offline | 6/6 | 6/6 | 5/6 (known, see Open) |
 | Local (pwx-local) | 6/6 | 6/6 | 6/6 |
-| Loader integrity and updates (M6) | 13/13 | 13/13 | 13/13 |
+| Loader integrity, updates and lockdown (M6) | 15/15 | 15/15 | 15/15 |
+| App origin refuses a hijacked loader | 9/9 | 9/9 | 9/9 |
 
 Leak matrix (`tests/run_matrix.sh`, Standard runtime, 36 vectors), shown as blocked / leaked. It's
 the same before and after Stage 2:
@@ -187,7 +227,7 @@ nothing either way.
 | ID | Status | Notes |
 | --- | --- | --- |
 | M4 | Open | Protections in the spec aren't built yet: transparency log with witnessed checkpoints, revocation, the key-rotation waiting period, the `sync` capability, device pairing and update policies. Until they are, the threat-table rows that depend on them don't hold. |
-| M6 residue | Browser limit | A host that serves a malicious `sw.js` still takes over the hosted loader; the loader's warning is advisory. Use the Verified tier (`pwx-local`) where that matters. See the M6 fix. |
+| M6 residue | Browser limit, reduced | A host that serves a malicious `sw.js` still takes over the hosted loader. The running page locks down, and app origins accept only genuine packages from the app's own publisher. Still possible: a wipe request, and replacing the app origins' own workers. See "Surviving a compromised host". |
 | WebKit offline | Open | In hosted mode, opening an installed app still requests `sw.js` for the app and the loader. Only WebKit does this (offline test 5/6). |
 | WebKit leaks | Browser limit | WebRTC and link preconnect leak in WebKit, and it has no switch to stop them. Strict apps aren't affected: they have no DOM and no `RTCPeerConnection`. |
 | Notes migration | Accepted for the spike | Notes saved in the old `pwx-notes` database aren't moved to `pwx-app-store`. |
