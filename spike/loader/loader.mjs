@@ -140,22 +140,8 @@ async function launch(id) {
   $("library").hidden = true;
   showLines(describe(manifest, await fingerprint(manifest.publisher)));
 
-  // The bootstrap only listens to its parent, and only on a channel the parent hands it.
   status("Installing verified files on the app origin…");
-  const boot = Object.assign(document.createElement("iframe"), { className: "bootstrap", src: `${APP}/__pwx/bootstrap.html` });
-  const booted = waitFor("bootstrap-ready", APP);
-  $("stage").append(boot);
-  await booted;
-  const channel = new MessageChannel();
-  const installed = new Promise((resolve, reject) => {
-    channel.port1.onmessage = (m) => {
-      if (m.data?.type === "installed") resolve();
-      if (m.data?.type === "install-failed") reject(new Error(m.data.error));
-    };
-  });
-  boot.contentWindow.postMessage({ type: "connect" }, APP, [channel.port2]);
-  channel.port1.postMessage({ type: "install", files, headers, guard });
-  await installed;
+  await bootstrapCall(APP, { type: "install", files, headers, guard }, "installed", "install-failed");
 
   status("Running app (sandboxed: no popups, no top navigation, no forms, no downloads).");
   addEventListener("message", (e) => { if (e.origin === APP) state.messages.push(e.data); });
@@ -172,6 +158,34 @@ async function launch(id) {
   state.phase = "running";
 }
 
+// The bootstrap only listens to its parent, and only on a channel the parent hands it.
+async function bootstrapCall(APP, msg, ok, failed, { keep = true } = {}) {
+  const boot = Object.assign(document.createElement("iframe"), { className: "bootstrap", src: `${APP}/__pwx/bootstrap.html` });
+  const booted = waitFor("bootstrap-ready", APP);
+  $("stage").append(boot);
+  await booted;
+  const channel = new MessageChannel();
+  const done = new Promise((resolve, reject) => {
+    channel.port1.onmessage = (m) => {
+      if (m.data?.type === ok) resolve();
+      if (m.data?.type === failed) reject(new PwxError("loader", m.data.error));
+    };
+  });
+  boot.contentWindow.postMessage({ type: "connect" }, APP, [channel.port2]);
+  channel.port1.postMessage(msg);
+  try { await done; } finally { if (!keep) boot.remove(); }
+}
+
+// Remove: wipe the app's origin first, then forget the app. If the wipe fails the app stays
+// installed, so its origin is never handed to another app with data still in it.
+async function removeApp(r) {
+  status(`Removing ${r.name} and its data…`);
+  const APP = await appOrigin(r.id, r);
+  await bootstrapCall(APP, { type: "wipe" }, "wiped", "wipe-failed", { keep: false });
+  await library.remove(r.id);
+  state.removed = (state.removed ?? []).concat(r.id);
+}
+
 // Library: installed apps, all local. Opening one makes no network request.
 async function showLibrary() {
   const apps = (await library.list()).sort((a, b) => a.name.localeCompare(b.name));
@@ -183,7 +197,10 @@ async function showLibrary() {
     open.setAttribute("aria-label", `Open ${r.name}`);
     const del = Object.assign(document.createElement("button"), { className: "btn", textContent: "Remove", type: "button" });
     del.setAttribute("aria-label", `Remove ${r.name}`);
-    del.addEventListener("click", async () => { await library.remove(r.id); showLibrary(); });
+    del.addEventListener("click", async () => {
+      try { await removeApp(r); await showLibrary(); }
+      catch (err) { status(`Couldn't remove ${r.name}: ${err.message}. It's still installed.`, "error"); state.phase = "remove-failed"; }
+    });
     li.append(name, meta, " ", open, " ", del);
     return li;
   }));

@@ -32,14 +32,38 @@
     }
   }
 
+  // Remove: erase everything the app left on this origin, so the origin can be reused safely.
+  // A database another tab still holds open blocks deletion; that fails the wipe (the loader
+  // then keeps the app) instead of leaving data behind for the next app.
+  function dropDatabase(name) {
+    return new Promise((resolve, reject) => {
+      const r = indexedDB.deleteDatabase(name);
+      const timer = setTimeout(() => reject(new Error(`database ${name} is still open`)), 5000);
+      r.onsuccess = () => { clearTimeout(timer); resolve(); };
+      r.onerror = () => { clearTimeout(timer); reject(r.error); };
+    });
+  }
+  async function wipe() {
+    const names = new Set(["pwx-app-store"]);
+    if (indexedDB.databases) for (const d of await indexedDB.databases()) if (d.name) names.add(d.name);
+    for (const name of names) await dropDatabase(name);
+    for (const key of await caches.keys()) await caches.delete(key);
+    try { localStorage.clear(); sessionStorage.clear(); } catch {}
+  }
+
   addEventListener("message", (e) => {
     if (connected || e.source !== window.parent || e.data?.type !== "connect" || !e.ports[0]) return;
     connected = true;
     const port = e.ports[0];
     port.onmessage = async (m) => {
-      if (m.data?.type !== "install") return;
-      try { await installFiles(m.data); port.postMessage({ type: "installed" }); }
-      catch (err) { port.postMessage({ type: "install-failed", error: String(err) }); }
+      if (m.data?.type === "install") {
+        try { await installFiles(m.data); port.postMessage({ type: "installed" }); }
+        catch (err) { port.postMessage({ type: "install-failed", error: String(err) }); }
+      }
+      if (m.data?.type === "wipe") {
+        try { await wipe(); port.postMessage({ type: "wiped" }); }
+        catch (err) { port.postMessage({ type: "wipe-failed", error: String(err) }); }
+      }
     };
   });
   window.parent.postMessage({ type: "bootstrap-ready" }, "*");

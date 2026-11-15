@@ -116,7 +116,9 @@ Each app runs on its own origin, so apps can't read each other's data.
 | Hosted | spike: `http://127.0.0.1:8110`–`8129`, standing in for per-app subdomains | the loader: FNV-1a(id) mod 20, linear probing; kept in the library record and across updates |
 | Local (pwx-local) | `http://127.0.0.1:<port>`, one port per app (up to 256) | pwx-local, through `POST /__pwx/origin` (same-origin only) |
 
-**Open (AUDIT N1):** removing an app frees its origin but leaves that origin's data behind.
+**Remove** wipes the app's origin (every IndexedDB database, every cache, `localStorage`) through
+the bootstrap channel, then deletes the library record. If the wipe fails the app stays installed,
+so an origin is never reused with data in it.
 
 ## 6. Runtimes
 
@@ -181,7 +183,7 @@ and per-app origins from the user's own machine.
 | An app leaks data to an undeclared host | CSP `connect-src`, no frames, forms or navigation; sandboxed iframe | blocked, except WebRTC in unhardened browsers and link preconnect in WebKit (AUDIT leak matrix) |
 | An app reaches the LAN, localhost or cloud metadata | private and local hosts rejected in the manifest | blocked |
 | An app escapes its sandbox (top-level open, self-navigation) | sandbox flags; framed-only pages return 403 | blocked |
-| **Another app reads this app's data** | opaque-origin worker + per-app origins + storage capability | blocked (C3); open: data after Remove (N1) |
+| **Another app reads this app's data** | opaque-origin worker + per-app origins + storage capability; Remove wipes the origin | blocked (C3, L3) |
 | An app poisons the runtime or its own verified code | runtime pinned by hash; Strict app has no cache access | blocked |
 | A website hijacks the bootstrap | framed-only, `MessageChannel` handshake, `frame-ancestors` | blocked |
 | A website drives pwx-local (CSRF, DNS rebinding) | POST + same-origin, `Host` check | blocked |
@@ -193,6 +195,5 @@ and per-app origins from the user's own machine.
 
 - The capabilities marked **not implemented** in section 3.
 - Per-app subdomains for hosted mode (the spike uses 20 ports).
-- Wiping an app's data on Remove (AUDIT N1).
 - Moving notes from the old `pwx-notes` database.
 - Other spec features tracked as audit finding M4.

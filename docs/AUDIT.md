@@ -1,12 +1,12 @@
 # PWX security audit: findings, fixes and results
 
 **Status (2026-11-15):** every working exploit from the audit is blocked in Chromium, Firefox and
-WebKit, including C3. Some findings remain open (see [Open](#open)), including one new issue found
-while writing this report (N1).
+WebKit, including C3. L3 (an app's data outlived Remove) is fixed too. M4 and M6 remain open
+(see [Open](#open)).
 
 | | |
 | --- | --- |
-| Code | branch `spike`: `03b3b65` (Stage 1), `25b2621` (Stage 2) |
+| Code | branch `spike`: `03b3b65` (Stage 1), `25b2621` (Stage 2), L3 fix (this commit) |
 | Engines | Chromium 159.0.8154.6, Firefox 159.0, WebKit 27.2 (Playwright, headless) |
 | Harness | audit harness on the test VPS: `run.sh` runs static checks, then `exploits.py` in each engine |
 | Spec | [`SPEC.md`](SPEC.md) |
@@ -89,13 +89,31 @@ diagnostic copy reported each step. It proves the thief ran and was denied every
 | `fetch` to the canary | blocked by CSP | blocked by CSP | blocked by CSP |
 | `RTCPeerConnection` | undefined | undefined | undefined |
 
+## L3 fix: data outlives Remove
+
+**L3:** removing an app deleted only its library record. Its origin went back into the pool, but
+the origin's data stayed. The next app given that origin could read it with `PwxUI.store.all()`:
+in hosted mode any app, and in both modes a later app with the same id from any publisher.
+
+**Fix:** Remove now wipes the app's origin before forgetting the app. The loader opens the origin's
+bootstrap on the same `MessageChannel` it uses for installs and sends `wipe`. The bootstrap deletes
+every IndexedDB database on the origin (`indexedDB.databases()`, plus `pwx-app-store`), every cache,
+and `localStorage` / `sessionStorage`. Only after it answers `wiped` does the loader delete the
+library record. If the wipe fails, for example because another tab still has the app open, the app
+stays installed and the loader says so. An origin is never handed out with data still in it. Only
+the loader can send `wipe`, because only the loader can frame the bootstrap.
+
+**Proof:** the Notes test now removes Notes, reinstalls it, checks it got the same origin, and
+checks no notes came back. With the wipe switched off, that test fails in all three engines
+(Chromium shows the old notes), which also reproduces L3. With the fix, it passes in all three.
+
 ## Test results after Stage 2
 
 | Suite | Chromium | Firefox | WebKit |
 | --- | --- | --- | --- |
 | Unit tests (`verify.test.mjs`, Node) | 46/46 | | |
 | Strict leak test | pass | pass | pass |
-| Notes | 7/7 | 7/7 | 7/7 |
+| Notes (includes the L3 test) | 9/9 | 9/9 | 9/9 |
 | Offline | 6/6 | 6/6 | 5/6 (known, see Open) |
 | Local (pwx-local) | 6/6 | 6/6 | 6/6 |
 
@@ -118,10 +136,8 @@ nothing either way.
 
 | ID | Status | Notes |
 | --- | --- | --- |
-| **N1** (new) | Open. Found by code review; no exploit written yet. | **Data outlives Remove.** Removing an app deletes only its library record. Its origin goes back into the pool, but the origin's `pwx-app-store` data stays. The next app given that origin can read it with `PwxUI.store.all()`. In hosted mode that can be any app; in both modes, a later app with the same id from any publisher. Fix: wipe the origin's storage on Remove through the bootstrap port, bind each origin to id plus publisher, and add a harness exploit. |
 | M4 | Open | Spec features not built yet. The details are in the first audit report. |
 | M6 | Open | The details are in the first audit report. |
-| L3 | Open | The details are in the first audit report. |
 | WebKit offline | Open | In hosted mode, opening an installed app still requests `sw.js` for the app and the loader. Only WebKit does this (offline test 5/6). |
 | WebKit leaks | Browser limit | WebRTC and link preconnect leak in WebKit, and it has no switch to stop them. Strict apps aren't affected: they have no DOM and no `RTCPeerConnection`. |
 | Notes migration | Accepted for the spike | Notes saved in the old `pwx-notes` database aren't moved to `pwx-app-store`. |

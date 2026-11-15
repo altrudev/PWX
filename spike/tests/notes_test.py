@@ -52,6 +52,21 @@ def main():
         check("delete works", app.get_by_role("button", name="Ideas").count() == 1)
         frame = next(f for f in page.frames if "/__pwx/strict.html" in f.url)
         check("renderer rejected nothing", frame.evaluate("() => (window.__pwxRejected || []).length") == 0)
+        # Audit N1: Remove erases the app's data, so whatever gets this origin next starts empty.
+        origin = page.evaluate("() => window.__pwx.appOrigin")
+        page.goto(LOADER + "/")
+        page.get_by_role("button", name="Remove Notes", exact=True).click()
+        # The page is already on the library before the click, so wait for the list itself to change.
+        try:
+            expect(page.get_by_role("button", name="Remove Notes", exact=True)).to_have_count(0, timeout=15000)
+            gone = True
+        except AssertionError:
+            gone = False
+        check("remove takes the app out of the library", gone and "org.example.notes" in page.evaluate("() => window.__pwx.removed || []"))
+        page.goto(f"{LOADER}/?pkg=notes")
+        expect(app.get_by_text("No notes yet")).to_be_visible(timeout=10000)
+        same = page.evaluate("() => window.__pwx.appOrigin") == origin
+        check("reinstalled on the same origin, no old notes", same and app.locator(".item").count() == 0)
         h = hits()
         check("no network contact (canary saw nothing)", not h["hits"] and h["tcp"] == 0)
         version = b.version; b.close()
