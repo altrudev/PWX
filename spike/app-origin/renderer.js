@@ -67,16 +67,40 @@
     }
   }
 
+  // ---------- grants: written by the bootstrap from the verified manifest at every launch ----------
+  // Opened and closed per read, so it never blocks a wipe. No pin or no grant means no access.
+  async function readGrants() {
+    try {
+      const d = await new Promise((ok, no) => {
+        const r = indexedDB.open("pwx-origin", 1);
+        r.onupgradeneeded = () => r.result.createObjectStore("pin");
+        r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error);
+      });
+      try {
+        const pin = await new Promise((ok, no) => {
+          const q = d.transaction("pin", "readonly").objectStore("pin").get("app");
+          q.onsuccess = () => ok(q.result); q.onerror = () => no(q.error);
+        });
+        return { storage: pin?.grants?.storage === true };
+      } finally { d.close(); }
+    } catch { return { storage: false }; }
+  }
+
   // ---------- storage capability: a key-value store kept here, on the app's own origin ----------
-  const db = new Promise((resolve, reject) => {
+  // Only for apps whose manifest declares capabilities.storage.local; the database isn't
+  // even opened otherwise.
+  let grants = { storage: false };
+  let db = null;
+  const openStore = () => db ??= new Promise((resolve, reject) => {
     const r = indexedDB.open("pwx-app-store", 1);
     r.onupgradeneeded = () => r.result.createObjectStore("kv");
     r.onsuccess = () => resolve(r.result);
     r.onerror = () => reject(r.error);
   });
   async function store(op, key, value) {
+    if (!grants.storage) throw new Error("storage not declared in the manifest");
     if (op !== "all" && (typeof key !== "string" || key.length === 0 || key.length > 256)) throw new Error("bad key");
-    const d = await db;
+    const d = await openStore();
     return new Promise((resolve, reject) => {
       const t = d.transaction("kv", op === "get" || op === "all" ? "readonly" : "readwrite");
       const s = t.objectStore("kv");
@@ -122,10 +146,12 @@
     remove: (id) => { op({ t: "remove", id }); for (const k of handlers.keys()) if (k.startsWith(id + ":")) handlers.delete(k); },
     focus: (id) => op({ t: "focus", id }),
     mount: (id) => op({ t: "append", parent: 0, id }),
-    store: { get: (k) => call("get", k), put: (k, v) => call("put", k, v), del: (k) => call("delete", k), all: () => call("all") },
+    /*STORE*/
   };
 })();
 `;
+  // Added to PwxUI only when the manifest declares storage, so apps can feature-detect it.
+  const STORE_API = `store: { get: (k) => call("get", k), put: (k, v) => call("put", k, v), del: (k) => call("delete", k), all: () => call("all") },`;
 
   function toDataUrl(text) {
     const bytes = new TextEncoder().encode(text);
@@ -139,7 +165,9 @@
   (async () => {
     const res = await caches.match("/" + entry, { cacheName: "pwx-verified" });
     if (!res) return reject({ t: "load" }, "missing-entry");
-    worker = new Worker(toDataUrl(PRELUDE + "\n;\n" + await res.text()));
+    grants = await readGrants();
+    const prelude = PRELUDE.replace("/*STORE*/", grants.storage ? STORE_API : "");
+    worker = new Worker(toDataUrl(prelude + "\n;\n" + await res.text()));
     worker.onmessage = async (e) => {
       const d = e.data || {};
       if (Array.isArray(d.ops)) d.ops.forEach(apply);

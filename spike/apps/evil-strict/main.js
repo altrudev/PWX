@@ -26,12 +26,24 @@ const attempts = {
 const connectionOnly = {
   "strict-link-preconnect": () => el("link", { rel: "preconnect", href: CANARY }),
 };
-onmessage = (e) => {
+// This app's manifest declares no storage, so it must get no store: neither the PwxUI.store
+// API nor a store request sent by hand.
+let storeProbe = null;
+const probeStore = () => new Promise((resolve) => {
+  storeProbe = resolve;
+  postMessage({ t: "store", rid: 1, op: "put", key: "probe", value: "stolen" });
+  setTimeout(() => resolve({ ok: null, error: "no reply" }), 3000);
+});
+onmessage = async (e) => {
+  if (e.data?.t === "store-result" && storeProbe) return storeProbe(e.data);
   if (e.data?.t !== "init") return;
   const mode = e.data.mode;
   let tried;
   el("h1", {}, "Strict runtime");
   if (connectionOnly[mode]) { connectionOnly[mode](); tried = [mode]; }
   else { Object.values(attempts).forEach((f) => f()); tried = Object.keys(attempts); }
-  postMessage({ ops: ops.splice(0), report: { type: "evil-done", mode, tried, hasRTC: typeof RTCPeerConnection !== "undefined" } });
+  postMessage({ ops: ops.splice(0) });
+  const raw = await probeStore();
+  postMessage({ report: { type: "evil-done", mode, tried, hasRTC: typeof RTCPeerConnection !== "undefined",
+    hasStoreApi: Boolean(self.PwxUI && self.PwxUI.store), rawStoreOk: raw.ok, rawStoreError: raw.error ?? null } });
 };

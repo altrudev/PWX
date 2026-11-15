@@ -232,9 +232,10 @@ nothing either way.
 | WebKit leaks | Browser limit | WebRTC and link preconnect leak in WebKit, and it has no switch to stop them. Strict apps aren't affected: they have no DOM and no `RTCPeerConnection`. |
 | Notes migration | Accepted for the spike | Notes saved in the old `pwx-notes` database aren't moved to `pwx-app-store`. |
 
-One more thing needs a decision: every Strict app gets `PwxUI.store`, whatever its manifest says
-under `capabilities.storage`. The store only reaches the app's own origin, so it can't leak, but
-the spec says apps get only the capabilities they declare.
+**Resolved (spike 0.4.1):** Strict apps used to get `PwxUI.store` whatever their manifest said.
+Now the store is granted only when the manifest declares `storage.local` (SPEC 6.3). The Strict
+test checks that an app without it gets no `PwxUI.store` and that a store request sent by hand is
+refused.
 
 ## How to rerun
 
