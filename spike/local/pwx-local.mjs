@@ -79,7 +79,7 @@ function appServer(bundle, port) {
     }
     if (u.pathname === "/__pwx/strict.html") {
       return sendFile(res, bundle, "app-origin/strict.html", { "Content-Security-Policy":
-        `default-src 'none'; script-src 'self'; worker-src 'self'; img-src blob:; style-src 'self'; font-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${LOADER}` });
+        `default-src 'none'; script-src 'self'; worker-src data:; img-src blob:; style-src 'self'; font-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${LOADER}` });
     }
     if (u.pathname === "/sw.js") return send(res, 200, sw, { "Content-Type": "text/javascript", "Service-Worker-Allowed": "/" });
     if (RUNTIME[u.pathname]) return sendFile(res, bundle, RUNTIME[u.pathname]);

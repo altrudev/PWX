@@ -12,7 +12,10 @@ import { join, extname, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(fileURLToPath(import.meta.url), "../..");
-const LOADER = "http://127.0.0.1:8100", APP = "http://127.0.0.1:8101";
+const LOADER = "http://127.0.0.1:8100", APP = "http://127.0.0.1:8110";
+// Each hosted app gets its own origin. On a real host these would be per-app subdomains.
+const APP_PORTS = Array.from({ length: 20 }, (_, i) => 8110 + i);
+const APP_ORIGINS = APP_PORTS.map((p) => `http://127.0.0.1:${p}`).join(" ");
 // PWX_TEST=1: serve the test config (test switches on) and the unsafe positive-control page.
 // Without it, this server behaves like a production host.
 const TEST = process.env.PWX_TEST === "1";
@@ -36,7 +39,7 @@ http.createServer((req, res) => {
   if (u.pathname === "/__test/reset") { hits.length = 0; tcp = 0; served.length = 0; return res.writeHead(204).end(); }
   if (u.pathname === "/__test/served") { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify(served)); }
   served.push(`loader ${u.pathname}`);
-  const csp = `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src ${APP}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
+  const csp = `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src ${APP_ORIGINS}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
   if (u.pathname === "/config.mjs") {
     if (TEST) { res.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" }); return res.end("export const TEST = true;\n"); }
     return serveFile(res, join(ROOT, "loader"), "config.mjs");
@@ -52,8 +55,8 @@ http.createServer((req, res) => {
   return serveFile(res, join(ROOT, "loader"), u.pathname.slice(1), { "Content-Security-Policy": csp });
 }).listen(8100, "127.0.0.1");
 
-// 8101 app origin: only the bootstrap and the service worker are ever served from the network.
-http.createServer((req, res) => {
+// App origins: only PWX runtime files and the service worker are ever served from the network.
+const appHandler = (req, res) => {
   const u = new URL(req.url, APP);
   served.push(`app ${u.pathname}`);
   // PWX pages may load only into a frame (or be fetched by this origin's own service worker),
@@ -77,7 +80,7 @@ http.createServer((req, res) => {
   }
   if (u.pathname === "/__pwx/strict.html") {
     return serveFile(res, join(ROOT, "app-origin"), "strict.html", {
-      "Content-Security-Policy": `default-src 'none'; script-src 'self'; worker-src 'self'; img-src blob:; style-src 'self'; font-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${LOADER}`,
+      "Content-Security-Policy": `default-src 'none'; script-src 'self'; worker-src data:; img-src blob:; style-src 'self'; font-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${LOADER}`,
     });
   }
   if (u.pathname === "/sw.js") {
@@ -86,7 +89,8 @@ http.createServer((req, res) => {
     return res.end(sw);
   }
   res.writeHead(404, { "Content-Type": "text/plain" }).end("not served from network");
-}).listen(8101, "127.0.0.1");
+};
+for (const port of APP_PORTS) http.createServer(appHandler).listen(port, "127.0.0.1");
 
 // 8102 control origin: the same leak-test app with no protections at all.
 http.createServer((req, res) => {
@@ -112,4 +116,4 @@ for (const [port, name] of [[3478, "webrtc-stun"], [3479, "webrtc-fresh-realm"],
   udp.bind(port, "127.0.0.1");
 }
 
-console.log("PWX spike servers up: loader :8100, app :8101, control :8102, canary :8199 + udp/3478-3480");
+console.log("PWX spike servers up: loader :8100, apps :8110-8129, control :8102, canary :8199 + udp/3478-3480");

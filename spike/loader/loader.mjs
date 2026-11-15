@@ -3,7 +3,9 @@ import { library } from "/store.mjs";
 import { TEST } from "/config.mjs";
 
 const LOADER = location.origin;
-const HOSTED_APP = "http://127.0.0.1:8101"; // hosted spike: one shared app origin
+// Hosted spike: each app gets its own origin from a fixed pool (ports stand in for per-app
+// subdomains). The assignment is kept with the installed app, so it never changes.
+const HOSTED_POOL = Array.from({ length: 20 }, (_, i) => `http://127.0.0.1:${8110 + i}`);
 const $ = (id) => document.getElementById(id);
 const state = (window.__pwx = { phase: "start", messages: [] });
 const status = (t, cls = "") => { $("status").textContent = t; $("status").className = cls; };
@@ -30,8 +32,17 @@ state.loaderReady = loaderReady.then((r) => { state.offlineReady = Boolean(r); }
 
 // Local mode gives every app its own origin. Allocation changes state, so it's a POST that
 // pwx-local accepts only from this page's own origin.
-async function appOrigin(id) {
-  if (!state.local) return HOSTED_APP;
+async function appOrigin(id, record) {
+  if (!state.local) {
+    if (record.origin) return record.origin;
+    const taken = new Set((await library.list()).map((r) => r.origin).filter(Boolean));
+    let h = 0x811c9dc5; for (const c of id) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+    for (let n = 0; n < HOSTED_POOL.length; n++) {
+      const origin = HOSTED_POOL[(h + n) % HOSTED_POOL.length];
+      if (!taken.has(origin)) { await library.put({ ...record, origin }); return origin; }
+    }
+    throw new PwxError("loader", "no free app origin");
+  }
   const r = await fetch(`/__pwx/origin?id=${encodeURIComponent(id)}`, { method: "POST" });
   if (!r.ok) throw new PwxError("loader", "no app origin");
   const { origin, fresh } = await r.json();
@@ -110,7 +121,7 @@ async function install(text) {
   if (!unchanged && !(await confirmInstall(manifest, await fingerprint(manifest.publisher), existing))) {
     throw new PwxError("loader", "install cancelled");
   }
-  await library.put({ id: manifest.id, name: manifest.name ?? manifest.id, version: manifest.version,
+  await library.put({ ...(existing ?? {}), id: manifest.id, name: manifest.name ?? manifest.id, version: manifest.version,
     publisher: manifest.publisher, runtime: manifest.runtime ?? "standard", manifestHash: hash, text, installedAt: Date.now() });
   return manifest.id;
 }
@@ -124,7 +135,7 @@ async function launch(id) {
   state.manifest = manifest;
   const headers = buildHeaders(manifest, LOADER);
   state.headers = headers;
-  const APP = await appOrigin(manifest.id);
+  const APP = await appOrigin(manifest.id, record);
   state.appOrigin = APP;
   $("library").hidden = true;
   showLines(describe(manifest, await fingerprint(manifest.publisher)));

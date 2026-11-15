@@ -8,14 +8,14 @@ const PINNED = {
   "/__pwx/bootstrap.html": "sha256-9JrT65ViQ0oqbSFmzplt36pXf3XbXBoIDwKedw2D+v0=",
   "/__pwx/bootstrap.js": "sha256-sdo+sqBVsDCo0ejbx8EHNUVXjgBpPoaR34JUtIJ6Vxc=",
   "/__pwx/strict.html": "sha256-uGg0JedU1IFHz3RYE0kPVzdLwjEZw5vw1MkDMV1UVYE=",
-  "/__pwx/renderer.js": "sha256-vR7qWLLGkZdjAEGPLi5K8ByKGNNOUzbYcHoCLjx80OI=",
+  "/__pwx/renderer.js": "sha256-ROxnSPFpYIq24Vtmlo1EUhnS5nUwpt2NahCEeOKQbOU=",
   "/__pwx/guard.js": "sha256-T5G742sbqECNwXC5VeaEMRdp6J5JL0nRwNQrr3474YI=",
   "/__pwx/ui.css": "sha256-pwAlPyW8ZnERztqY6NLPsZMz89x6BBjG34LjRZ61jPw="
 };
 // END PINNED RUNTIME
 const LOADER_ORIGIN = "__PWX_LOADER_ORIGIN__"; // substituted by the server that serves this script
 const RUNTIME = "pwx-runtime-v1";
-const STRICT_CSP = `default-src 'none'; script-src 'self'; worker-src 'self'; img-src blob:; style-src 'self'; font-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${LOADER_ORIGIN}`;
+const STRICT_CSP = `default-src 'none'; script-src 'self'; worker-src data:; img-src blob:; style-src 'self'; font-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${LOADER_ORIGIN}`;
 const HEADERS = {
   "/__pwx/bootstrap.html": { "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": `default-src 'self'; script-src 'self'; frame-ancestors ${LOADER_ORIGIN}` },
   "/__pwx/strict.html": { "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": STRICT_CSP },

@@ -32,7 +32,7 @@ with sync_playwright() as p:
         page = b.new_context().new_page()
         page.goto(f"http://127.0.0.1:8100/?pkg={name}"); time.sleep(1.5)
         st = page.evaluate("() => window.__pwx")
-        frames = [f.url for f in page.frames if "127.0.0.1:8101" in f.url]
+        frames = [f.url for f in page.frames if any(f"127.0.0.1:{port}/" in f.url for port in range(8110, 8130))]
         ok = st["phase"] == "rejected" and st.get("error") == code and not frames
         fails += not ok
         print(f"{name:12} expected {code:9} got {st['phase']}/{st.get('error')}  app frames: {len(frames)}  {'OK' if ok else 'FAIL'}")

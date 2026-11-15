@@ -1,28 +1,10 @@
-// PWX Notes: a strict-runtime app. Runs only in a worker, stores notes in this app's
-// own IndexedDB, and has no network capability at all.
-importScripts("pwx-ui.js");
-const { el, text, attr, prop, append, remove, focus, mount } = self.PwxUI;
-
-// ---------- storage ----------
-const db = new Promise((resolve, reject) => {
-  const r = indexedDB.open("pwx-notes", 1);
-  r.onupgradeneeded = () => r.result.createObjectStore("notes", { keyPath: "id" });
-  r.onsuccess = () => resolve(r.result);
-  r.onerror = () => reject(r.error);
-});
-async function tx(mode, fn) {
-  const d = await db;
-  return new Promise((resolve, reject) => {
-    const t = d.transaction("notes", mode);
-    const req = fn(t.objectStore("notes"));
-    t.oncomplete = () => resolve(req ? req.result : undefined);
-    t.onerror = () => reject(t.error);
-  });
-}
+// PWX Notes: a strict-runtime app. Runs only in an opaque-origin worker, keeps notes in the
+// storage the PWX runtime provides, and has no network capability at all.
+const { el, text, attr, prop, append, remove, focus, mount, store: kv } = self.PwxUI;
 const store = {
-  all: () => tx("readonly", (s) => s.getAll()),
-  put: (n) => tx("readwrite", (s) => s.put(n)),
-  del: (id) => tx("readwrite", (s) => s.delete(id)),
+  all: () => kv.all(),
+  put: (n) => kv.put(n.id, n),
+  del: (id) => kv.del(id),
 };
 
 // ---------- state ----------

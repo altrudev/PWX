@@ -1,7 +1,9 @@
 // PWX strict runtime: loader-owned renderer. App code never runs in this document.
-// It runs only in a worker (no DOM, and no WebRTC in current engines) and sends declarative
-// UI operations, which this renderer applies through a fixed allowlist. No element that can
-// fetch, connect or hint (link, iframe, script, style, a, object, ...) can be created.
+// App code runs in a worker started from a data: URL, which gives it an OPAQUE origin: it has
+// no access to this origin's CacheStorage or IndexedDB (and, in every engine, no WebRTC and no
+// DOM). It can only send messages. UI requests go through a fixed allowlist; storage requests
+// go to a per-app store this renderer keeps on the app origin. So the app can't rewrite the
+// PWX runtime or its own verified code, and it can't reach any other app's data.
 (() => {
   "use strict";
   const p = new URLSearchParams(location.hash.slice(1));
@@ -24,7 +26,8 @@
   const rejected = [];
   const reject = (op, why) => rejected.push(`${op.t}:${why}:${String(op.tag || op.name || "")}`);
   window.__pwxRejected = rejected; // test visibility; no app code runs in this document
-  const worker = new Worker("/" + entry);
+  let worker = null;
+  const toWorker = (msg) => worker && worker.postMessage(msg);
 
   function apply(op) {
     switch (op && op.t) {
@@ -55,7 +58,7 @@
       case "listen": {
         const n = nodes.get(op.id), type = String(op.type);
         if (!n || !EVENTS.has(type)) return reject(op, "event");
-        n.addEventListener(type, (e) => worker.postMessage({
+        n.addEventListener(type, (e) => toWorker({
           t: "event", id: op.id, type, value: e.target.value ?? null, key: e.key ?? null,
         }));
         return;
@@ -64,10 +67,88 @@
     }
   }
 
-  worker.onmessage = (e) => {
-    const d = e.data || {};
-    if (Array.isArray(d.ops)) d.ops.forEach(apply);
-    if (d.report) parent.postMessage({ ...d.report, rejected }, "*");
+  // ---------- storage capability: a key-value store kept here, on the app's own origin ----------
+  const db = new Promise((resolve, reject) => {
+    const r = indexedDB.open("pwx-app-store", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("kv");
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+  async function store(op, key, value) {
+    if (op !== "all" && (typeof key !== "string" || key.length === 0 || key.length > 256)) throw new Error("bad key");
+    const d = await db;
+    return new Promise((resolve, reject) => {
+      const t = d.transaction("kv", op === "get" || op === "all" ? "readonly" : "readwrite");
+      const s = t.objectStore("kv");
+      const req = op === "get" ? s.get(key) : op === "put" ? s.put(value, key) : op === "delete" ? s.delete(key) : op === "all" ? s.getAll() : null;
+      if (!req) return reject(new Error("bad op"));
+      t.oncomplete = () => resolve(op === "get" || op === "all" ? req.result : undefined);
+      t.onerror = () => reject(t.error);
+    });
+  }
+
+  // ---------- the client library every app worker gets, ahead of its own code ----------
+  const PRELUDE = `self.PwxUI = (() => {
+  let nextId = 1, queue = [], scheduled = false, rid = 0;
+  const handlers = new Map(), pending = new Map();
+  const op = (o) => {
+    queue.push(o);
+    if (!scheduled) { scheduled = true; queueMicrotask(() => { scheduled = false; const ops = queue; queue = []; postMessage({ ops }); }); }
   };
-  worker.postMessage({ t: "init", mode });
+  function el(tag, attrs = {}, ...children) {
+    const kids = children.flat().filter((c) => c !== null && c !== undefined && c !== false);
+    const id = nextId++;
+    op({ t: "create", id, tag });
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k.startsWith("on") && typeof v === "function") { handlers.set(id + ":" + k.slice(2), v); op({ t: "listen", id, type: k.slice(2) }); }
+      else if (v !== undefined && v !== null && v !== false) op({ t: "attr", id, name: k, value: v === true ? "" : String(v) });
+    }
+    if (kids.length === 1 && typeof kids[0] === "string") op({ t: "text", id, value: kids[0] });
+    else for (const c of kids) op({ t: "append", parent: id, id: typeof c === "number" ? c : el("span", {}, String(c)) });
+    return id;
+  }
+  const call = (o, key, value) => new Promise((resolve, reject) => { const id = ++rid; pending.set(id, { resolve, reject }); postMessage({ t: "store", rid: id, op: o, key, value }); });
+  self.addEventListener("message", (e) => {
+    const d = e.data || {};
+    if (d.t === "event") handlers.get(d.id + ":" + d.type)?.(d.value, d.key);
+    if (d.t === "store-result") { const q = pending.get(d.rid); if (q) { pending.delete(d.rid); d.ok ? q.resolve(d.value) : q.reject(new Error(d.error)); } }
+  });
+  return {
+    el,
+    text: (id, value) => op({ t: "text", id, value: String(value) }),
+    attr: (id, name, value) => op({ t: "attr", id, name, value: String(value) }),
+    prop: (id, name, value) => op({ t: "prop", id, name, value }),
+    append: (parent, id) => op({ t: "append", parent, id }),
+    remove: (id) => { op({ t: "remove", id }); for (const k of handlers.keys()) if (k.startsWith(id + ":")) handlers.delete(k); },
+    focus: (id) => op({ t: "focus", id }),
+    mount: (id) => op({ t: "append", parent: 0, id }),
+    store: { get: (k) => call("get", k), put: (k, v) => call("put", k, v), del: (k) => call("delete", k), all: () => call("all") },
+  };
+})();
+`;
+
+  function toDataUrl(text) {
+    const bytes = new TextEncoder().encode(text);
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return "data:text/javascript;base64," + btoa(bin);
+  }
+
+  // The app's verified code comes from the cache only the bootstrap writes (app code can't
+  // reach this origin's caches), then runs in an opaque-origin worker.
+  (async () => {
+    const res = await caches.match("/" + entry, { cacheName: "pwx-verified" });
+    if (!res) return reject({ t: "load" }, "missing-entry");
+    worker = new Worker(toDataUrl(PRELUDE + "\n;\n" + await res.text()));
+    worker.onmessage = async (e) => {
+      const d = e.data || {};
+      if (Array.isArray(d.ops)) d.ops.forEach(apply);
+      if (d.t === "store") {
+        try { toWorker({ t: "store-result", rid: d.rid, ok: true, value: await store(String(d.op), d.key, d.value) }); }
+        catch (err) { toWorker({ t: "store-result", rid: d.rid, ok: false, error: String(err && err.message || err) }); }
+      }
+      if (d.report) parent.postMessage({ ...d.report, rejected }, "*");
+    };
+    toWorker({ t: "init", mode });
+  })();
 })();

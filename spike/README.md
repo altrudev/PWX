@@ -13,7 +13,7 @@ hosts it didn't declare.
 | `loader/` | Loader page (Host-verified tier). Verifies, shows capabilities, installs files on the app origin, runs the app in a sandboxed frame |
 | `app-origin/` | App-origin bootstrap and service worker. The SW serves only verified files from cache, with headers from the manifest |
 | `apps/evil/` | Leak-test app: 27 ways to send data to an undeclared host |
-| `server/serve.mjs` | Local servers: loader `:8100`, app origin `:8101`, unprotected control `:8102`, canary `:8199` + UDP `3478` |
+| `server/serve.mjs` | Local servers: loader `:8100`, per-app origins `:8110`–`:8129`, unprotected control `:8102`, canary `:8199` + UDP `3478` |
 | `tests/` | Unit tests (tests 2–5), browser leak test (test 1), browser rejection test |
 
 Spike simplifications: the package is a JSON container rather than a Signed Web Bundle, there's one
