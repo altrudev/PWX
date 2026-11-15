@@ -24,7 +24,7 @@ The goals are privacy, no data loss, and users who own their data.
 
 ## Status
 
-Early design, with a working, security-audited spike (spike release 0.4.0). On this branch (`spike`):
+Early design, with a working, security-audited spike (spike release 0.4.1). On this branch (`spike`):
 
 - [`docs/SPEC.md`](docs/SPEC.md): **PWX Specification v0 (Draft)**, as built
 - [`docs/AUDIT.md`](docs/AUDIT.md): security audit, fixes and cross-browser results
