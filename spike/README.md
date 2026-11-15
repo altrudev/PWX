@@ -35,7 +35,11 @@ can see that vector), and once through the PWX loader. A vector counts as blocke
 leaked in the control and not through PWX. Navigating vectors each get their own run. A
 declared-host run confirms that declared hosts still work.
 
-## Results so far (Chrome 153, headless)
+## First results (week one, Chrome 153, headless)
+
+Current results for all three engines (Chromium, Firefox and WebKit) are in
+[`../docs/AUDIT.md`](../docs/AUDIT.md). Unit tests: 46 of 46 pass as of spike release 0.4.0.
+The week-one results, kept for the record:
 
 - Unit tests: 34 of 34 pass.
 - Tampered packages (changed byte, extra file, changed capability, duplicate key): all rejected in the browser; the app never starts.
@@ -44,8 +48,7 @@ declared-host run confirms that declared hosts still work.
 - Preconnect is untested because the control run opened no connection.
 - Declared hosts work. `<a ping>` and `<link rel=prefetch>` follow `connect-src`.
 
-Firefox and Safari (WebKit) haven't been run yet; their browser downloads weren't available
-in the environment this was built in.
+Firefox and WebKit were run later; see the audit.
 
 ## Later additions
 
