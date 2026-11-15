@@ -5,11 +5,12 @@
 // the signed pwx-local binary; the OS code signature is the root of trust.
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { canonicalize, sha256, b64 } from "../lib/pwx-verify.mjs";
 
 const ROOT = join(fileURLToPath(import.meta.url), "../..");
-const [version = "0.0.0-dev", keyPath = join(ROOT, "packages/.release-key.json")] = process.argv.slice(2);
+const [version = "0.0.0-dev", keyPath = join(process.env.PWX_KEYS ?? join(homedir(), ".config/pwx-dev"), "release-key.json")] = process.argv.slice(2);
 if (!existsSync(keyPath)) {
   const kp = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
   writeFileSync(keyPath, JSON.stringify(await crypto.subtle.exportKey("jwk", kp.privateKey)), { mode: 0o600 });

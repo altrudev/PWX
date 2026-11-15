@@ -12,15 +12,21 @@ const te = new TextEncoder();
 
 // ---------- Strict JSON: rejects duplicate keys, which JSON.parse silently accepts ----------
 
+const MAX_DEPTH = 64, MAX_TEXT = 64 * 1024 * 1024;
 export function strictParse(text) {
-  let i = 0;
+  if (typeof text !== "string" || text.length > MAX_TEXT) throw new PwxError("json", "input too large");
+  let i = 0, depth = 0;
   const ws = () => { while (i < text.length && " \t\n\r".includes(text[i])) i++; };
   const fail = (m) => { throw new PwxError("json", `${m} at ${i}`); };
   function value() {
     ws();
     const c = text[i];
-    if (c === "{") return object();
-    if (c === "[") return array();
+    if (c === "{" || c === "[") {
+      if (++depth > MAX_DEPTH) fail("nested too deeply");
+      const v = c === "{" ? object() : array();
+      depth--;
+      return v;
+    }
     if (c === '"') return string();
     if (c === "t" && text.startsWith("true", i)) { i += 4; return true; }
     if (c === "f" && text.startsWith("false", i)) { i += 5; return false; }
@@ -98,6 +104,14 @@ const ORIGIN_RE = /^(https|wss):\/\/((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*
 const PATH_RE = /^app\/(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
 const HASH_RE = /^sha256-[A-Za-z0-9+/]{43}=$/;
 
+// IP literals, localhost and private-use names: an app must not reach the user's machine,
+// home network or cloud metadata. (A future, separately granted capability could allow LAN.)
+function isLocalHost(host) {
+  if (/^\d+(\.\d+){3}$/.test(host)) return true;          // any IPv4 literal
+  if (/^\d+$/.test(host.split(".").pop())) return true;      // numeric last label
+  return host === "localhost" || /\.(localhost|local|internal|home\.arpa|lan)$/.test(host);
+}
+
 export function checkOrigin(o, { allowLoopbackHttp = false } = {}) {
   if (typeof o !== "string") throw new PwxError("manifest", "origin must be a string");
   if (allowLoopbackHttp && /^(http|ws):\/\/127\.0\.0\.1:[1-9][0-9]{0,4}$/.test(o)) return o;
@@ -105,6 +119,7 @@ export function checkOrigin(o, { allowLoopbackHttp = false } = {}) {
   if (!m) throw new PwxError("manifest", `bad origin ${JSON.stringify(o)}`);
   if (m[3] && Number(m[3]) > 65535) throw new PwxError("manifest", `bad port in ${o}`);
   if (m[2].split(".").some((l) => l.startsWith("xn--") && l.length < 5)) throw new PwxError("manifest", `bad label in ${o}`);
+  if (isLocalHost(m[2])) throw new PwxError("manifest", `local or private host not allowed: ${o}`);
   return o;
 }
 
@@ -115,7 +130,7 @@ export function validateManifest(m, opts = {}) {
   need(m && typeof m === "object" && !Array.isArray(m), "manifest must be an object");
   need(m.pwx === "0", "unsupported pwx version");
   need(typeof m.id === "string" && /^[a-z0-9]+(\.[a-z0-9-]+)+$/.test(m.id), "bad id");
-  need(typeof m.version === "string" && /^\d+\.\d+\.\d+$/.test(m.version), "bad version");
+  need(typeof m.version === "string" && /^\d{1,9}\.\d{1,9}\.\d{1,9}$/.test(m.version), "bad version");
   need(typeof m.publisher === "string" && m.publisher.startsWith("ed25519:"), "bad publisher");
   need(typeof m.entry === "string" && PATH_RE.test(m.entry), "bad entry");
   const caps = m.capabilities ?? {};

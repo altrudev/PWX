@@ -13,6 +13,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(fileURLToPath(import.meta.url), "../..");
 const LOADER = "http://127.0.0.1:8100", APP = "http://127.0.0.1:8101";
+// PWX_TEST=1: serve the test config (test switches on) and the unsafe positive-control page.
+// Without it, this server behaves like a production host.
+const TEST = process.env.PWX_TEST === "1";
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json", ".css": "text/css" };
 
 const hits = []; let tcp = 0;
@@ -33,11 +36,19 @@ http.createServer((req, res) => {
   if (u.pathname === "/__test/reset") { hits.length = 0; tcp = 0; served.length = 0; return res.writeHead(204).end(); }
   if (u.pathname === "/__test/served") { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify(served)); }
   served.push(`loader ${u.pathname}`);
-  const csp = `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src ${APP}; object-src 'none'; base-uri 'none'; form-action 'none'`;
+  const csp = `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src ${APP}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
+  if (u.pathname === "/config.mjs") {
+    if (TEST) { res.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" }); return res.end("export const TEST = true;\n"); }
+    return serveFile(res, join(ROOT, "loader"), "config.mjs");
+  }
   if (u.pathname === "/" ) return serveFile(res, join(ROOT, "loader"), "index.html", { "Content-Security-Policy": csp });
   if (u.pathname.startsWith("/lib/")) return serveFile(res, join(ROOT, "lib"), u.pathname.slice(5));
   if (u.pathname === "/sw.js") return serveFile(res, join(ROOT, "loader"), "sw.js", { "Cache-Control": "max-age=86400" });
-  if (u.pathname.startsWith("/packages/")) return serveFile(res, join(ROOT, "packages"), u.pathname.slice(10));
+  if (u.pathname.startsWith("/packages/")) {
+    const name = u.pathname.slice(10); // only package files, never anything else in that folder
+    if (!/^[a-z0-9-]+\.pwx\.json$/.test(name)) return res.writeHead(404).end();
+    return serveFile(res, join(ROOT, "packages"), name);
+  }
   return serveFile(res, join(ROOT, "loader"), u.pathname.slice(1), { "Content-Security-Policy": csp });
 }).listen(8100, "127.0.0.1");
 
@@ -45,6 +56,13 @@ http.createServer((req, res) => {
 http.createServer((req, res) => {
   const u = new URL(req.url, APP);
   served.push(`app ${u.pathname}`);
+  // PWX pages may load only into a frame (or be fetched by this origin's own service worker),
+  // never as a tab. Browsers send Sec-Fetch-Dest; a top-level open says "document".
+  const framedOnly = u.pathname === "/__pwx/bootstrap.html" || u.pathname.startsWith("/__pwx/strict");
+  const dest = req.headers["sec-fetch-dest"], site = req.headers["sec-fetch-site"];
+  if (framedOnly && !(dest === "iframe" || (dest === "empty" && site === "same-origin"))) {
+    return res.writeHead(403, { "Content-Type": "text/plain" }).end("PWX pages only open inside the PWX loader.");
+  }
   if (u.pathname === "/__pwx/bootstrap.html") {
     return serveFile(res, join(ROOT, "app-origin"), "bootstrap.html", {
       "Content-Security-Policy": `default-src 'self'; script-src 'self'; frame-ancestors ${LOADER}`,
@@ -54,7 +72,7 @@ http.createServer((req, res) => {
   if (u.pathname === "/__pwx/guard.js") return serveFile(res, join(ROOT, "app-origin"), "guard.js");
   if (u.pathname === "/__pwx/renderer.js") return serveFile(res, join(ROOT, "app-origin"), "renderer.js");
   if (u.pathname === "/__pwx/ui.css") return serveFile(res, join(ROOT, "app-origin"), "ui.css");
-  if (u.pathname === "/__pwx/strict-unsafe.html") {
+  if (TEST && u.pathname === "/__pwx/strict-unsafe.html") {
     return serveFile(res, join(ROOT, "app-origin"), "strict.html", { "Content-Security-Policy": `frame-ancestors ${LOADER}` });
   }
   if (u.pathname === "/__pwx/strict.html") {
@@ -62,7 +80,11 @@ http.createServer((req, res) => {
       "Content-Security-Policy": `default-src 'none'; script-src 'self'; worker-src 'self'; img-src blob:; style-src 'self'; font-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${LOADER}`,
     });
   }
-  if (u.pathname === "/sw.js") return serveFile(res, join(ROOT, "app-origin"), "sw.js", { "Service-Worker-Allowed": "/", "Cache-Control": "max-age=86400" });
+  if (u.pathname === "/sw.js") {
+    const sw = readFileSync(join(ROOT, "app-origin/sw.js"), "utf8").replace("__PWX_LOADER_ORIGIN__", LOADER);
+    res.writeHead(200, { "Content-Type": "text/javascript", "Service-Worker-Allowed": "/", "Cache-Control": "max-age=86400" });
+    return res.end(sw);
+  }
   res.writeHead(404, { "Content-Type": "text/plain" }).end("not served from network");
 }).listen(8101, "127.0.0.1");
 

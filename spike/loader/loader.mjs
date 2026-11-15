@@ -1,5 +1,6 @@
-import { verifyPackage, buildHeaders, cmpVersion, PwxError } from "/lib/pwx-verify.mjs";
+import { verifyPackage, buildHeaders, cmpVersion, canonicalize, sha256, strictParse, PwxError } from "/lib/pwx-verify.mjs";
 import { library } from "/store.mjs";
+import { TEST } from "/config.mjs";
 
 const LOADER = location.origin;
 const HOSTED_APP = "http://127.0.0.1:8101"; // hosted spike: one shared app origin
@@ -7,36 +8,51 @@ const $ = (id) => document.getElementById(id);
 const state = (window.__pwx = { phase: "start", messages: [] });
 const status = (t, cls = "") => { $("status").textContent = t; $("status").className = cls; };
 const params = new URLSearchParams(location.search);
-// Dev-only hook: accept http/ws loopback origins (spike tests). Never in a real loader.
-const dev = params.get("dev") === "1";
+// Test switches exist only when the server provides a test config. Production builds (and
+// pwx-local) ship TEST = false, so no link can change how the loader behaves.
+const test = (name) => (TEST && params.has(name) ? params.get(name) : null);
+const dev = test("dev") === "1";           // accept http/ws loopback hosts (test canary)
+const mode = test("mode") ?? "";           // passed to leak-test apps
+const guard = test("guard") === "1";       // inject the guard script
+const unsafe = dev && test("unsafe") === "1"; // positive control: renderer allowlist off
+if (!/^[a-z-]*$/.test(mode)) throw new PwxError("loader", "bad mode");
 
 // A local loader (pwx-local) answers /__pwx/mode itself; the hosted loader's service worker
 // answers it on the device, so asking never reaches a remote host after the first visit.
 const modeReady = fetch("/__pwx/mode").then((r) => (r.ok ? r.json() : { local: false })).catch(() => ({ local: false }));
-// Hosted mode: the loader keeps itself on the device, so installed apps open with no network.
-// Local mode: the loader already lives on this machine, so no service worker is needed.
 const loaderReady = modeReady.then((m) => {
   state.local = Boolean(m.local);
   if (m.local || !("serviceWorker" in navigator)) return null;
   return navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "all" })
     .then(() => navigator.serviceWorker.ready).catch(() => null);
 });
-// Local mode gives every app its own origin (its own port), so apps can't share storage.
+state.loaderReady = loaderReady.then((r) => { state.offlineReady = Boolean(r); });
+
+// Local mode gives every app its own origin. Allocation changes state, so it's a POST that
+// pwx-local accepts only from this page's own origin.
 async function appOrigin(id) {
   if (!state.local) return HOSTED_APP;
-  const r = await fetch(`/__pwx/origin?id=${encodeURIComponent(id)}`);
+  const r = await fetch(`/__pwx/origin?id=${encodeURIComponent(id)}`, { method: "POST" });
   if (!r.ok) throw new PwxError("loader", "no app origin");
   const { origin, fresh } = await r.json();
   if (fresh) { location.reload(); await new Promise(() => {}); }
   return origin;
 }
-state.loaderReady = loaderReady.then((r) => { state.offlineReady = Boolean(r); });
 
-function describe(m) {
+const enc = new TextEncoder();
+const manifestHash = (m) => sha256(enc.encode(canonicalize(m)));
+// A short, readable fingerprint of the publisher key, shown before every install.
+async function fingerprint(publisher) {
+  const b = (await sha256(enc.encode(publisher))).slice(7, 23);
+  return b.match(/.{4}/g).join(" ");
+}
+
+function describe(m, fp) {
   const c = m.capabilities ?? {};
   const hosts = c.network?.connect ?? [];
   return [
     `${m.name ?? m.id} ${m.version}`,
+    `Publisher key ${fp}`,
     hosts.length ? `Can send data to: ${hosts.join(", ")}` : "Cannot send data to any host.",
     // Spike finding: no engine enforces CSP "webrtc 'block'" for pages, and WebKit also
     // lets preconnect through. Strict apps run only in a worker, so neither applies.
@@ -46,36 +62,61 @@ function describe(m) {
     ...["camera", "microphone", "location", "notifications"].filter((k) => c[k]).map((k) => `Can use ${k}`),
   ];
 }
+function showLines(lines) {
+  $("consent").hidden = false;
+  $("consent").replaceChildren(...lines.map((line) => Object.assign(document.createElement("div"), { textContent: line })));
+}
+
+// Consent is a decision: nothing is installed until the user confirms (test builds auto-confirm).
+function confirmInstall(manifest, fp, existing) {
+  showLines([existing ? `Update from ${existing.version}` : "Install this app?", ...describe(manifest, fp)]);
+  state.phase = "consent";
+  if (TEST) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const yes = Object.assign(document.createElement("button"), { id: "install-confirm", className: "btn", type: "button", textContent: existing ? "Update" : "Install" });
+    const no = Object.assign(document.createElement("button"), { id: "install-cancel", className: "btn", type: "button", textContent: "Cancel" });
+    yes.addEventListener("click", () => resolve(true), { once: true });
+    no.addEventListener("click", () => resolve(false), { once: true });
+    $("consent").append(yes, " ", no);
+    status("Review this app before installing it.");
+  });
+}
 
 function waitFor(type, from) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const on = (e) => {
-      if (e.origin !== from) return;
-      if (e.data?.type === type) { removeEventListener("message", on); resolve(e); }
-      if (e.data?.type === "install-failed") { removeEventListener("message", on); reject(new Error(e.data.error)); }
+      if (e.origin !== from || e.data?.type !== type) return;
+      removeEventListener("message", on); resolve(e);
     };
     addEventListener("message", on);
   });
 }
 
-// Install: verify, then keep the signed package locally. The first install pins the
-// publisher key; later versions must come from the same key and never go backwards.
+// Install: verify, ask, then keep the signed package locally. The first install pins the
+// publisher key; later versions must come from the same key, never go backwards, and a
+// version number can't be reused for different content.
 async function install(text) {
   const { manifest } = await verifyPackage(text, { allowLoopbackHttp: dev });
+  const hash = await manifestHash(manifest);
   const existing = await library.get(manifest.id);
   if (existing && existing.publisher !== manifest.publisher) throw new PwxError("signature", "publisher changed");
-  if (existing && cmpVersion(manifest.version, existing.version) < 0) {
-    throw new PwxError("rollback", `${manifest.version} is older than installed ${existing.version}`);
+  if (existing) {
+    const order = cmpVersion(manifest.version, existing.version);
+    if (order < 0) throw new PwxError("rollback", `${manifest.version} is older than installed ${existing.version}`);
+    const prev = existing.manifestHash ?? await manifestHash(strictParse(strictParse(existing.text).manifest));
+    if (order === 0 && prev !== hash) throw new PwxError("rollback", `version ${manifest.version} was already installed with different content`);
+  }
+  const unchanged = existing && existing.version === manifest.version;
+  if (!unchanged && !(await confirmInstall(manifest, await fingerprint(manifest.publisher), existing))) {
+    throw new PwxError("loader", "install cancelled");
   }
   await library.put({ id: manifest.id, name: manifest.name ?? manifest.id, version: manifest.version,
-    publisher: manifest.publisher, runtime: manifest.runtime ?? "standard", text, installedAt: Date.now() });
+    publisher: manifest.publisher, runtime: manifest.runtime ?? "standard", manifestHash: hash, text, installedAt: Date.now() });
   return manifest.id;
 }
 
 // Launch: re-verify the stored package from scratch every time, offline, then run it.
 async function launch(id) {
-  const mode = params.get("mode") ?? ""; // test hook: passed to the app as #fragment (not part of any hash)
-  if (!/^[a-z-]*$/.test(mode)) throw new PwxError("loader", "bad mode");
   const record = await library.get(id);
   if (!record) throw new PwxError("loader", `${id} is not installed`);
   status("Verifying installed package…");
@@ -86,16 +127,23 @@ async function launch(id) {
   const APP = await appOrigin(manifest.id);
   state.appOrigin = APP;
   $("library").hidden = true;
-  $("consent").hidden = false;
-  $("consent").replaceChildren(...describe(manifest).map((line) => Object.assign(document.createElement("div"), { textContent: line })));
+  showLines(describe(manifest, await fingerprint(manifest.publisher)));
 
+  // The bootstrap only listens to its parent, and only on a channel the parent hands it.
   status("Installing verified files on the app origin…");
-  const boot = Object.assign(document.createElement("iframe"), { className: "bootstrap", src: `${APP}/__pwx/bootstrap.html#loader=${encodeURIComponent(LOADER)}` });
+  const boot = Object.assign(document.createElement("iframe"), { className: "bootstrap", src: `${APP}/__pwx/bootstrap.html` });
   const booted = waitFor("bootstrap-ready", APP);
   $("stage").append(boot);
   await booted;
-  const installed = waitFor("installed", APP);
-  boot.contentWindow.postMessage({ type: "install", files, headers, guard: params.get("guard") === "1" }, APP);
+  const channel = new MessageChannel();
+  const installed = new Promise((resolve, reject) => {
+    channel.port1.onmessage = (m) => {
+      if (m.data?.type === "installed") resolve();
+      if (m.data?.type === "install-failed") reject(new Error(m.data.error));
+    };
+  });
+  boot.contentWindow.postMessage({ type: "connect" }, APP, [channel.port2]);
+  channel.port1.postMessage({ type: "install", files, headers, guard });
   await installed;
 
   status("Running app (sandboxed: no popups, no top navigation, no forms, no downloads).");
@@ -105,8 +153,7 @@ async function launch(id) {
   app.setAttribute("sandbox", "allow-scripts allow-same-origin");
   app.setAttribute("allow", "camera 'none'; microphone 'none'; geolocation 'none'");
   if (manifest.runtime === "strict") {
-    const unsafe = dev && params.get("unsafe") === "1"; // test-only positive control
-    app.src = `${APP}/__pwx/${unsafe ? "strict-unsafe" : "strict"}.html#entry=${encodeURIComponent(manifest.entry)}&mode=${mode || "passive"}${unsafe ? "&unsafe=1" : ""}`;
+    app.src = `${APP}/__pwx/${unsafe ? "strict-unsafe" : "strict"}.html#entry=${encodeURIComponent(manifest.entry)}&mode=${mode || "passive"}`;
   } else {
     app.src = `${APP}/${manifest.entry}${mode ? "#" + mode : ""}`;
   }
@@ -117,12 +164,11 @@ async function launch(id) {
 // Library: installed apps, all local. Opening one makes no network request.
 async function showLibrary() {
   const apps = (await library.list()).sort((a, b) => a.name.localeCompare(b.name));
-  const list = $("apps");
-  list.replaceChildren(...apps.map((r) => {
+  $("apps").replaceChildren(...apps.map((r) => {
     const li = document.createElement("li");
     const name = Object.assign(document.createElement("strong"), { textContent: `${r.name} ${r.version}` });
     const meta = Object.assign(document.createElement("span"), { className: "meta", textContent: ` ${r.runtime} runtime` });
-    const open = Object.assign(document.createElement("a"), { className: "btn", textContent: "Open", href: `/?open=${encodeURIComponent(r.id)}${dev ? "&dev=1" : ""}` });
+    const open = Object.assign(document.createElement("a"), { className: "btn", textContent: "Open", href: `/?open=${encodeURIComponent(r.id)}` });
     open.setAttribute("aria-label", `Open ${r.name}`);
     const del = Object.assign(document.createElement("button"), { className: "btn", textContent: "Remove", type: "button" });
     del.setAttribute("aria-label", `Remove ${r.name}`);
@@ -137,7 +183,7 @@ async function showLibrary() {
   state.apps = apps.map((r) => r.id);
 }
 
-// Sideload: install a .pwx file from disk. Same verification as any install.
+// Sideload: install a .pwx file from disk. Same verification and consent as any install.
 $("file").addEventListener("change", async (e) => {
   const file = e.target.files?.[0]; if (!file) return;
   try {

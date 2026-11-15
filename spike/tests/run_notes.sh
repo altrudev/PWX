@@ -3,7 +3,7 @@
 set -u
 cd "$(dirname "$0")/.."
 node tools/build-packages.mjs
-node server/serve.mjs > /tmp/pwx-serve.log 2>&1 &
+PWX_TEST=1 node server/serve.mjs > /tmp/pwx-serve.log 2>&1 &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null' EXIT
 sleep 1

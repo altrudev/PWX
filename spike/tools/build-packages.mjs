@@ -2,13 +2,17 @@
 // Builds the spike's test packages into packages/ with a local development key.
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { pack } from "./pack.mjs";
 
 const ROOT = join(fileURLToPath(import.meta.url), "../..");
 const out = join(ROOT, "packages");
 mkdirSync(out, { recursive: true });
-const key = join(out, ".dev-key.json");
+// Signing keys never live in a served folder.
+const KEYS = process.env.PWX_KEYS ?? join(homedir(), ".config/pwx-dev");
+mkdirSync(KEYS, { recursive: true, mode: 0o700 });
+const key = join(KEYS, "dev-key.json");
 if (!existsSync(key)) {
   const kp = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
   writeFileSync(key, JSON.stringify(await crypto.subtle.exportKey("jwk", kp.privateKey)), { mode: 0o600 });

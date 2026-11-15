@@ -30,7 +30,7 @@ def main():
     checks = []
     def check(name, ok, note=""):
         checks.append(bool(ok)); print(f"{'OK  ' if ok else 'FAIL'} {name}{('  ' + note) if note else ''}")
-    server = subprocess.Popen(["node", "server/serve.mjs"], cwd=ROOT, stdout=subprocess.DEVNULL)
+    server = subprocess.Popen(["node", "server/serve.mjs"], cwd=ROOT, stdout=subprocess.DEVNULL, env={**__import__("os").environ, "PWX_TEST": "1"})
     time.sleep(1)
     try:
         with sync_playwright() as p:

@@ -1,7 +1,7 @@
 // Loader service worker: keeps the loader itself on the device so installed apps launch
 // with no network at all. It contacts the host only when the user installs from it.
 const CACHE = "pwx-loader-v1";
-const SHELL = ["/", "/loader.mjs", "/loader.css", "/store.mjs", "/lib/pwx-verify.mjs"];
+const SHELL = ["/", "/loader.mjs", "/loader.css", "/store.mjs", "/config.mjs", "/lib/pwx-verify.mjs"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

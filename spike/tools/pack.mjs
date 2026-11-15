@@ -33,6 +33,8 @@ export async function pack(appDir, templatePath, keyPath, opts = {}) {
 
   const files = {}, hashes = {};
   for (const abs of walk(appDir).sort()) {
+    const rel = relative(appDir, abs);
+    if (rel === "manifest.template.json" || rel.split(/[\\/]/).some((part) => part.startsWith("."))) continue;
     const path = "app/" + relative(appDir, abs).split("\\").join("/");
     const bytes = new Uint8Array(readFileSync(abs));
     files[path] = b64.enc(bytes);

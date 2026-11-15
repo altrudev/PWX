@@ -127,3 +127,26 @@ test("test 5: an older validly signed version is rejected", async () => {
 test("sanity: sha256 helper matches SRI format", async () => {
   assert.match(await sha256(new Uint8Array([1])), /^sha256-[A-Za-z0-9+/]{43}=$/);
 });
+
+// ---- Audit fixes (M2, L1, L2, L4) ----
+for (const o of ["https://192.168.1.1", "https://127.0.0.1", "https://localhost:631", "https://10.0.0.1:8080",
+  "https://169.254.169.254", "https://printer.local", "https://router.lan", "https://db.internal", "https://a.localhost"]) {
+  test(`audit M2: local or private host rejected ${o}`, () => {
+    assert.throws(() => validateManifest({ ...base, files: { "app/index.html": "sha256-" + "A".repeat(43) + "=" },
+      publisher: "ed25519:x", capabilities: { network: { connect: [o] } } }), PwxError);
+  });
+}
+test("audit L1: deep nesting and oversized input fail cleanly", () => {
+  assert.throws(() => strictParse("[".repeat(200000)), (e) => e instanceof PwxError && /deeply/.test(e.message));
+  assert.doesNotThrow(() => strictParse("[".repeat(60) + "]".repeat(60)));
+});
+test("audit L2: version parts are limited to 9 digits", () => {
+  assert.throws(() => validateManifest({ ...base, version: "9007199254740993.0.0", publisher: "ed25519:x",
+    files: { "app/index.html": "sha256-" + "A".repeat(43) + "=" } }), PwxError);
+});
+test("audit L4: the packer never ships the manifest template or hidden files", async () => {
+  writeFileSync(join(appDir, ".secret"), "token");
+  writeFileSync(join(appDir, "manifest.template.json"), "{}");
+  const pkg = JSON.parse(await build());
+  assert.deepEqual(Object.keys(pkg.files).sort(), ["app/app.js", "app/index.html"]);
+});

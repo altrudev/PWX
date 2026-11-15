@@ -12,6 +12,12 @@ from playwright.sync_api import sync_playwright, expect
 ROOT = Path(__file__).resolve().parents[1]
 LOADER = "http://127.0.0.1:7100"
 settled = "() => window.__pwx && ['running','library','rejected'].includes(window.__pwx.phase)"
+consent_or_settled = "() => window.__pwx && ['consent','running','library','rejected'].includes(window.__pwx.phase)"
+
+def open_pkg(page, url):
+    page.goto(url); page.wait_for_function(consent_or_settled, timeout=20000)
+    if page.evaluate("() => window.__pwx.phase") == "consent":
+        page.click("#install-confirm")
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--browser", default="chromium"); a = ap.parse_args()
@@ -31,13 +37,13 @@ def main():
             ctx = b.new_context(); hosts = set()
             ctx.on("request", lambda r: hosts.add(urlparse(r.url).hostname))
             page = ctx.new_page(); app = page.frame_locator("iframe.app")
-            page.goto(f"{LOADER}/?pkg=notes"); page.wait_for_function(settled, timeout=20000)
+            open_pkg(page, f"{LOADER}/?pkg=notes"); page.wait_for_function(settled, timeout=20000)
             app.get_by_role("button", name="New note").click()
             app.get_by_label("Title", exact=True).fill("Local note")
             expect(app.get_by_text("Saved on this device")).to_be_visible(timeout=5000)
             notes_origin = page.evaluate("() => window.__pwx.appOrigin")
             check("Notes installs and runs from pwx-local", page.evaluate("() => window.__pwx.local") is True, notes_origin)
-            page.goto(f"{LOADER}/?pkg=evil-strict")
+            open_pkg(page, f"{LOADER}/?pkg=evil-strict")
             # A new app reloads the loader once (to allow its new origin), so wait for the final page.
             page.wait_for_function("() => window.__pwx && window.__pwx.phase === 'running' && window.__pwx.appOrigin", timeout=20000)
             expect(app.get_by_role("heading", name="Strict runtime")).to_be_visible(timeout=10000)

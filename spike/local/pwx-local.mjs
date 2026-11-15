@@ -47,6 +47,9 @@ async function verifyBundle() {
 const portsFile = join(HOME, "ports.json");
 const loadPorts = () => (existsSync(portsFile) ? JSON.parse(readFileSync(portsFile, "utf8")) : {});
 const ID_RE = /^[a-z0-9]+(\.[a-z0-9-]+)+$/;
+const MAX_APPS = 256;
+// DNS-rebinding defense: answer only requests addressed to this exact loopback host and port.
+const hostOk = (req, port) => req.headers.host === `${HOSTNAME}:${port}`;
 
 function send(res, status, body, headers = {}) {
   res.writeHead(status, { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...headers });
@@ -61,8 +64,16 @@ function sendFile(res, bundle, path, headers = {}) {
 function appServer(bundle, port) {
   const RUNTIME = { "/__pwx/bootstrap.js": "app-origin/bootstrap.js", "/__pwx/guard.js": "app-origin/guard.js",
     "/__pwx/renderer.js": "app-origin/renderer.js", "/__pwx/ui.css": "app-origin/ui.css" };
+  const sw = new TextEncoder().encode(new TextDecoder().decode(bundle.files.get("app-origin/sw.js")).replace("__PWX_LOADER_ORIGIN__", LOADER));
   return http.createServer((req, res) => {
+    if (!hostOk(req, port)) return send(res, 421, "wrong host");
     const u = new URL(req.url, `http://${HOSTNAME}:${port}`);
+    // PWX pages load only into a frame (or via this origin's own service worker), never as a tab.
+    const framedOnly = u.pathname === "/__pwx/bootstrap.html" || u.pathname === "/__pwx/strict.html";
+    const dest = req.headers["sec-fetch-dest"], site = req.headers["sec-fetch-site"];
+    if (framedOnly && !(dest === "iframe" || (dest === "empty" && site === "same-origin"))) {
+      return send(res, 403, "PWX pages only open inside the PWX loader.");
+    }
     if (u.pathname === "/__pwx/bootstrap.html") {
       return sendFile(res, bundle, "app-origin/bootstrap.html", { "Content-Security-Policy": `default-src 'self'; script-src 'self'; frame-ancestors ${LOADER}` });
     }
@@ -70,7 +81,7 @@ function appServer(bundle, port) {
       return sendFile(res, bundle, "app-origin/strict.html", { "Content-Security-Policy":
         `default-src 'none'; script-src 'self'; worker-src 'self'; img-src blob:; style-src 'self'; font-src 'none'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${LOADER}` });
     }
-    if (u.pathname === "/sw.js") return sendFile(res, bundle, "app-origin/sw.js", { "Service-Worker-Allowed": "/" });
+    if (u.pathname === "/sw.js") return send(res, 200, sw, { "Content-Type": "text/javascript", "Service-Worker-Allowed": "/" });
     if (RUNTIME[u.pathname]) return sendFile(res, bundle, RUNTIME[u.pathname]);
     send(res, 404, "not served from network");
   }).listen(port, HOSTNAME);
@@ -86,14 +97,19 @@ async function serve() {
   const appOrigins = () => Object.values(ports).map((p) => `http://${HOSTNAME}:${p}`).join(" ") || "'none'";
 
   const LOADER_FILES = { "/": "loader/index.html", "/loader.mjs": "loader/loader.mjs", "/loader.css": "loader/loader.css",
-    "/store.mjs": "loader/store.mjs", "/lib/pwx-verify.mjs": "lib/pwx-verify.mjs" };
+    "/store.mjs": "loader/store.mjs", "/config.mjs": "loader/config.mjs", "/lib/pwx-verify.mjs": "lib/pwx-verify.mjs" };
   http.createServer((req, res) => {
+    if (!hostOk(req, PORT)) return send(res, 421, "wrong host");
     const u = new URL(req.url, LOADER);
     if (u.pathname === "/__pwx/mode") return send(res, 200, JSON.stringify({ local: true, version: bundle.version }), { "Content-Type": "application/json" });
     if (u.pathname === "/__pwx/origin") {
+      // Changes state, so: POST only, and only from the loader page itself (not other sites).
+      const sameOrigin = req.headers["sec-fetch-site"] === "same-origin" || req.headers.origin === LOADER;
+      if (req.method !== "POST" || !sameOrigin) return send(res, 403, "forbidden");
       const id = u.searchParams.get("id") ?? "";
       if (!ID_RE.test(id)) return send(res, 400, "bad id");
       const fresh = !ports[id];
+      if (fresh && Object.keys(ports).length >= MAX_APPS) return send(res, 429, "too many apps");
       if (fresh) {
         const used = new Set(Object.values(ports));
         let p = PORT + 1; while (used.has(p)) p++;
@@ -112,7 +128,7 @@ async function serve() {
     if (!path) return send(res, 404, "not found");
     // The loader page may frame only the app origins this machine has assigned.
     sendFile(res, bundle, path, { "Content-Security-Policy":
-      `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src ${appOrigins()}; object-src 'none'; base-uri 'none'; form-action 'none'` });
+      `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src ${appOrigins()}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'` });
   }).listen(PORT, HOSTNAME, () => {
     console.log(`pwx-local ${bundle.version}: verified ${bundle.files.size} files, serving ${LOADER} (loopback only)`);
   });

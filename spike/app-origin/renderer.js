@@ -7,7 +7,8 @@
   const p = new URLSearchParams(location.hash.slice(1));
   const entry = p.get("entry");
   const mode = p.get("mode") || "passive";
-  const unsafe = p.get("unsafe") === "1"; // TEST ONLY: positive control with the allowlist off
+  // Positive control with the allowlist off. Only test servers serve strict-unsafe.html.
+  const unsafe = location.pathname === "/__pwx/strict-unsafe.html";
   if (!/^app\/[A-Za-z0-9._/-]+\.js$/.test(entry || "")) return;
 
   const TAGS = new Set(["div", "p", "span", "h1", "h2", "h3", "ul", "ol", "li", "button",
