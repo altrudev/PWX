@@ -9,7 +9,7 @@ M4 remains open (see [Open](#open)).
 | --- | --- |
 | Code | branch `spike`: `03b3b65` (Stage 1), `25b2621` (Stage 2), `20b1797` (L3), `38b6769` (M6), host-compromise layers (this commit) |
 | Engines | Chromium 159.0.8154.6, Firefox 159.0, WebKit 27.2 (Playwright, headless) |
-| Harness | audit harness on the test VPS: `run.sh` runs static checks, then `exploits.py` in each engine |
+| Harness | [`spike/audit/`](../spike/audit/): `run.sh` runs static checks, then `exploits.py` in each engine |
 | Spec | [`SPEC.md`](SPEC.md) |
 
 This file is now the audit record in the repo. The first audit report was a shared doc. Finding
@@ -241,12 +241,12 @@ the spec says apps get only the capabilities they declare.
 ```bash
 cd spike
 node tools/pin-runtime.mjs && node tools/build-packages.mjs && node tools/make-release.mjs
-node <audit>/build.mjs           # rebuild the audit apps
-bash <audit>/run.sh              # every exploit must print "blocked": 0 of 10 per engine
+bash audit/run.sh                # rebuilds the attack apps; every exploit must print "blocked": 0 of 10 per engine
 bash tests/run_all.sh            # unit, strict, notes, offline, local, leak matrix
 ```
 
 - Firefox needs `media.peerconnection.ice.loopback=True` for the WebRTC tests.
 - The attacker site is `https://127.0.0.2:9443`. Chromium needs
   `--ip-address-space-overrides=127.0.0.2:9443=public`.
-- The audit harness (attack apps and exploit scripts) isn't in this repo.
+- The audit harness (attack apps and exploit scripts) is in `spike/audit/`. `build.mjs` signs the
+  attack app with your dev key from `~/.config/pwx-dev/dev-key.json`, like any publisher could.

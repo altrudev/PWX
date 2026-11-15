@@ -1,0 +1,11 @@
+{
+  "pwx": "0",
+  "id": "org.example.calculator",
+  "name": "Calculator",
+  "version": "1.0.0",
+  "runtime": "strict",
+  "entry": "app/main.js",
+  "capabilities": {
+    "network": { "connect": [], "webrtc": "none" }
+  }
+}
