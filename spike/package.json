@@ -9,5 +9,6 @@
     "build": "node tools/build-packages.mjs",
     "serve": "node server/serve.mjs"
   },
+  "author": "Valentyn Rukhaylo (Altru) <https://altru.dev>",
   "license": "Apache-2.0"
 }
