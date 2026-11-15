@@ -6,8 +6,10 @@ the declared limits instead of relying on the publisher's promise.
 
 ## Status
 
-Early design. The working specification is **PWX Specification v0 (Draft)**, kept as a
-shared doc for now; it will move into this repo as it stabilizes.
+Early design, with a working spike. On the `spike` branch:
+
+- [`docs/SPEC.md`](docs/SPEC.md): **PWX Specification v0 (Draft)**, as built
+- [`docs/AUDIT.md`](docs/AUDIT.md): security audit, fixes and cross-browser results
 
 ## Branches
 
