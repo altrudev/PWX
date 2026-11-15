@@ -10,7 +10,8 @@ import { fileURLToPath } from "node:url";
 import { canonicalize, sha256, b64 } from "../lib/pwx-verify.mjs";
 
 const ROOT = join(fileURLToPath(import.meta.url), "../..");
-const [version = "0.0.0-dev", keyPath = join(process.env.PWX_KEYS ?? join(homedir(), ".config/pwx-dev"), "release-key.json")] = process.argv.slice(2);
+const [version = readFileSync(join(ROOT, "VERSION"), "utf8").trim(), keyPath = join(process.env.PWX_KEYS ?? join(homedir(), ".config/pwx-dev"), "release-key.json")] = process.argv.slice(2);
+if (!/^\d{1,9}\.\d{1,9}\.\d{1,9}$/.test(version)) throw new Error(`version must be x.y.z, got ${version}`);
 if (!existsSync(keyPath)) {
   const kp = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
   writeFileSync(keyPath, JSON.stringify(await crypto.subtle.exportKey("jwk", kp.privateKey)), { mode: 0o600 });

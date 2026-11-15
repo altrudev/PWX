@@ -13,3 +13,4 @@ iframe.bootstrap { display: none; }
 .btn { display: inline-block; padding: 4px 10px; border: 1px solid #999; border-radius: 6px;
   background: #fff; color: #111; text-decoration: none; font: inherit; cursor: pointer; }
 #file { margin-left: 8px; }
+#loader-update { margin-top: 16px; padding-top: 8px; border-top: 1px solid #ddd; color: #444; }

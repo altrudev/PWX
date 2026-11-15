@@ -30,6 +30,80 @@ const loaderReady = modeReady.then((m) => {
 });
 state.loaderReady = loaderReady.then((r) => { state.offlineReady = Boolean(r); });
 
+// ---------- loader updates (hosted tier) ----------
+// The service worker holds the signed loader release and checks every file against it. Updates
+// happen only from here, when the user asks; nothing checks the host in the background.
+async function controller() {
+  if (navigator.serviceWorker.controller) return navigator.serviceWorker.controller;
+  await new Promise((resolve) => {
+    navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
+    setTimeout(resolve, 10000);
+  });
+  return navigator.serviceWorker.controller;
+}
+async function askSw(type) {
+  const sw = await controller();
+  if (!sw) return { ok: false, error: "the loader isn't installed for offline use" };
+  return new Promise((resolve) => {
+    const ch = new MessageChannel();
+    const timer = setTimeout(() => resolve({ ok: false, error: "the loader's service worker didn't answer" }), 60000);
+    ch.port1.onmessage = (m) => { clearTimeout(timer); resolve(m.data); };
+    sw.postMessage({ type }, [ch.port2]);
+  });
+}
+const updateMsg = (t, cls = "") => { $("update-msg").textContent = t; $("update-msg").className = cls; };
+async function showLoaderVersion() {
+  const s = await askSw("status");
+  state.loaderVersion = s.ok ? s.version : null;
+  $("loader-version").textContent = s.ok ? `Loader ${s.version} (signed release).` : `Loader integrity: ${s.error}.`;
+  $("loader-update").hidden = false;
+}
+$("update-check").addEventListener("click", async () => {
+  $("update-apply").hidden = true;
+  updateMsg("Checking the host for a signed loader update…");
+  const r = (state.loaderCheck = await askSw("check-update"));
+  if (!r.ok) return updateMsg(`Update refused: ${r.error}.`, "error");
+  if (r.upToDate) return updateMsg(`Up to date (${r.version}).`);
+  updateMsg(`Signed loader ${r.available} is available. Your apps and their data stay as they are.`);
+  $("update-apply").hidden = false;
+});
+$("update-apply").addEventListener("click", async () => {
+  updateMsg("Downloading the update and checking every file against its signature…");
+  const r = (state.loaderApply = await askSw("apply-update"));
+  if (!r.ok) return updateMsg(`Update refused: ${r.error}. You're still on ${state.loaderVersion}.`, "error");
+  location.reload();
+});
+// The browser re-fetches sw.js from the host by itself and can't be stopped. When it brings a
+// new one, compare it with what a signed release says sw.js should be, and say so if it isn't.
+// (Advisory: a hostile host can serve this check a different copy than the browser got.)
+async function checkServiceWorkerChange() {
+  try {
+    const body = new Uint8Array(await (await fetch("/sw.js", { cache: "no-store" })).arrayBuffer());
+    const got = await sha256(body);
+    const cur = await askSw("status");
+    if (cur.ok && got === cur.sw) { state.swChange = "same"; return; }
+    const next = await askSw("check-update");
+    if (next.ok && next.sw === got) {
+      state.swChange = "signed";
+      updateMsg(`The loader's service worker was updated to match signed release ${next.available ?? next.version}.`);
+      if (next.available) $("update-apply").hidden = false;
+      return;
+    }
+    state.swChange = "unsigned";
+    updateMsg("Warning: the host changed the loader's service worker, and no signed release matches it. " +
+      "The host may be compromised. Your apps' data stays on their own origins, but avoid installing or updating until this is explained.", "error");
+  } catch (err) { state.swChange = "error"; }
+  $("loader-update").hidden = false;
+}
+loaderReady.then((reg) => {
+  if (!reg) return;
+  reg.addEventListener("updatefound", () => {
+    const w = reg.installing;
+    w?.addEventListener("statechange", () => { if (w.state === "activated") checkServiceWorkerChange(); });
+  });
+  showLoaderVersion();
+});
+
 // Local mode gives every app its own origin. Allocation changes state, so it's a POST that
 // pwx-local accepts only from this page's own origin.
 async function appOrigin(id, record) {

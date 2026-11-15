@@ -10,6 +10,8 @@ import dgram from "node:dgram";
 import { readFileSync, existsSync } from "node:fs";
 import { join, extname, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
+import { canonicalize, sha256, b64 } from "../lib/pwx-verify.mjs";
 
 const ROOT = join(fileURLToPath(import.meta.url), "../..");
 const LOADER = "http://127.0.0.1:8100", APP = "http://127.0.0.1:8110";
@@ -25,6 +27,37 @@ const hits = []; let tcp = 0;
 const served = []; // requests that reached the loader or app host (not test hooks)
 const record = (kind, path) => hits.push({ kind, path, at: Date.now() });
 
+// The loader release: local/release.json as signed by tools/make-release.mjs. The test server
+// serves the test config, so it re-signs the release with that file's hash, and its test hooks
+// can play a host that offers newer, older, forged or broken releases, or a changed sw.js.
+const TEST_CONFIG = "export const TEST = true;\n";
+const hostile = { release: "normal", sw: "normal", tamper: false, swNoStore: false };
+async function signRelease(release, forged = false) {
+  const keyPath = join(process.env.PWX_KEYS ?? join(homedir(), ".config/pwx-dev"), "release-key.json");
+  const jwk = JSON.parse(readFileSync(keyPath, "utf8"));
+  const pub = b64.enc(b64.dec(jwk.x.replace(/-/g, "+").replace(/_/g, "/") + "="));
+  const priv = forged
+    ? (await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign"])).privateKey
+    : await crypto.subtle.importKey("jwk", jwk, { name: "Ed25519" }, false, ["sign"]);
+  const sig = b64.enc(new Uint8Array(await crypto.subtle.sign({ name: "Ed25519" }, priv, new TextEncoder().encode(canonicalize(release)))));
+  return JSON.stringify({ release, sig: { alg: "ed25519", key: pub, sig } });
+}
+const bump = (v, d) => { const p = v.split(".").map(Number); p[2] += d; return p.join("."); };
+async function loaderRelease() {
+  const signed = readFileSync(join(ROOT, "local/release.json"), "utf8");
+  if (!TEST) return signed;
+  const release = structuredClone(JSON.parse(signed).release);
+  release.files["loader/config.mjs"] = await sha256(new TextEncoder().encode(TEST_CONFIG));
+  if (hostile.sw === "changed" && hostile.release === "next") release.files["loader/sw.js"] = await sha256(new TextEncoder().encode(swBody()));
+  const r = hostile.release;
+  if (r === "next" || r === "badfile" || r === "forged") release.version = bump(release.version, r === "next" ? 1 : 2);
+  if (r === "older") release.version = "0.0.1";
+  if (r === "same-different") release.files["loader/loader.css"] = await sha256(new TextEncoder().encode("/* other */"));
+  if (r === "badfile") release.files["loader/loader.mjs"] = await sha256(new TextEncoder().encode("// not the real loader"));
+  return signRelease(release, r === "forged");
+}
+const swBody = () => readFileSync(join(ROOT, "loader/sw.js"), "utf8") + (hostile.sw === "changed" ? "\n// changed by the host\n" : "");
+
 function serveFile(res, base, rel, headers = {}) {
   const p = normalize(join(base, rel));
   if (!p.startsWith(base) || !existsSync(p)) { res.writeHead(404).end(); return; }
@@ -37,16 +70,32 @@ http.createServer((req, res) => {
   const u = new URL(req.url, LOADER);
   if (u.pathname === "/__test/hits") { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ hits, tcp })); }
   if (u.pathname === "/__test/reset") { hits.length = 0; tcp = 0; served.length = 0; return res.writeHead(204).end(); }
+  if (TEST && u.pathname === "/__test/loader") {
+    for (const k of ["release", "sw"]) if (u.searchParams.has(k)) hostile[k] = u.searchParams.get(k);
+    if (u.searchParams.has("tamper")) hostile.tamper = u.searchParams.get("tamper") === "1";
+    if (u.searchParams.has("swcache")) hostile.swNoStore = u.searchParams.get("swcache") === "0";
+    return res.writeHead(204).end();
+  }
   if (u.pathname === "/__test/served") { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify(served)); }
   served.push(`loader ${u.pathname}`);
   const csp = `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src ${APP_ORIGINS}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
+  if (u.pathname === "/loader-release.json") {
+    return loaderRelease().then((body) => res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(body));
+  }
+  if (TEST && hostile.tamper && u.pathname === "/loader.mjs") {
+    res.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" });
+    return res.end('document.title = "tampered";\n');
+  }
   if (u.pathname === "/config.mjs") {
-    if (TEST) { res.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" }); return res.end("export const TEST = true;\n"); }
+    if (TEST) { res.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" }); return res.end(TEST_CONFIG); }
     return serveFile(res, join(ROOT, "loader"), "config.mjs");
   }
   if (u.pathname === "/" ) return serveFile(res, join(ROOT, "loader"), "index.html", { "Content-Security-Policy": csp });
   if (u.pathname.startsWith("/lib/")) return serveFile(res, join(ROOT, "lib"), u.pathname.slice(5));
-  if (u.pathname === "/sw.js") return serveFile(res, join(ROOT, "loader"), "sw.js", { "Cache-Control": "max-age=86400" });
+  if (u.pathname === "/sw.js") {
+    res.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": hostile.swNoStore ? "no-store" : "max-age=86400" });
+    return res.end(swBody());
+  }
   if (u.pathname.startsWith("/packages/")) {
     const name = u.pathname.slice(10); // only package files, never anything else in that folder
     if (!/^[a-z0-9-]+\.pwx\.json$/.test(name)) return res.writeHead(404).end();

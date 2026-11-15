@@ -5,7 +5,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { sha256 } from "../lib/pwx-verify.mjs";
+import { homedir } from "node:os";
+import { sha256, b64 } from "../lib/pwx-verify.mjs";
 
 const ROOT = join(fileURLToPath(import.meta.url), "../..");
 const FILES = { "/__pwx/bootstrap.html": "bootstrap.html", "/__pwx/bootstrap.js": "bootstrap.js",
@@ -21,3 +22,14 @@ const block = /(\/\/ BEGIN PINNED RUNTIME[^\n]*\n)[\s\S]*?(\/\/ END PINNED RUNTI
 if (!block.test(sw)) throw new Error("pin markers not found in sw.js");
 writeFileSync(swPath, sw.replace(block, `$1const PINNED = ${JSON.stringify(pinned, null, 2)};\n$2`));
 console.log(`pinned ${Object.keys(pinned).length} runtime files in app-origin/sw.js`);
+
+// The hosted loader's service worker accepts loader releases signed with this key only.
+const keyPath = join(process.env.PWX_KEYS ?? join(homedir(), ".config/pwx-dev"), "release-key.json");
+const { x } = JSON.parse(readFileSync(keyPath, "utf8"));
+const releaseKey = b64.enc(b64.dec(x.replace(/-/g, "+").replace(/_/g, "/") + "="));
+const loaderSw = join(ROOT, "loader/sw.js");
+const lsw = readFileSync(loaderSw, "utf8");
+const lblock = /(\/\/ BEGIN PINNED LOADER[^\n]*\n)[\s\S]*?(\/\/ END PINNED LOADER)/;
+if (!lblock.test(lsw)) throw new Error("pin markers not found in loader/sw.js");
+writeFileSync(loaderSw, lsw.replace(lblock, `$1const RELEASE_KEY = ${JSON.stringify(releaseKey)};\n$2`));
+console.log("pinned the release key in loader/sw.js");

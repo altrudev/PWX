@@ -12,6 +12,12 @@
   <input id="file" type="file" accept=".json,.pwx,application/json">
 </section>
 <section id="consent" hidden></section>
+<section id="loader-update" hidden>
+  <span id="loader-version"></span>
+  <button class="btn" id="update-check" type="button">Check for loader update</button>
+  <button class="btn" id="update-apply" type="button" hidden>Update loader</button>
+  <p id="update-msg"></p>
+</section>
 <div id="stage"></div>
 <script type="module" src="/loader.mjs"></script>
 </body></html>

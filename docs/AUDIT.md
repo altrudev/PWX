@@ -1,12 +1,13 @@
 # PWX security audit: findings, fixes and results
 
 **Status (2026-11-15):** every working exploit from the audit is blocked in Chromium, Firefox and
-WebKit, including C3. L3 (an app's data outlived Remove) is fixed too. M4 and M6 remain open
-(see [Open](#open)).
+WebKit, including C3. L3 (an app's data outlived Remove) is fixed. M6 (the hosted loader was never
+checked or updated) is fixed as far as a web host allows; what remains is a browser limit, below.
+M4 remains open (see [Open](#open)).
 
 | | |
 | --- | --- |
-| Code | branch `spike`: `03b3b65` (Stage 1), `25b2621` (Stage 2), L3 fix (this commit) |
+| Code | branch `spike`: `03b3b65` (Stage 1), `25b2621` (Stage 2), `20b1797` (L3), M6 fix (this commit) |
 | Engines | Chromium 159.0.8154.6, Firefox 159.0, WebKit 27.2 (Playwright, headless) |
 | Harness | audit harness on the test VPS: `run.sh` runs static checks, then `exploits.py` in each engine |
 | Spec | [`SPEC.md`](SPEC.md) |
@@ -107,6 +108,54 @@ the loader can send `wipe`, because only the loader can frame the bootstrap.
 checks no notes came back. With the wipe switched off, that test fails in all three engines
 (Chromium shows the old notes), which also reproduces L3. With the fix, it passes in all three.
 
+## M6 fix: the hosted loader is checked and updated only from signed releases
+
+**M6:** the hosted loader's service worker cached the loader once and served it forever, with no
+integrity check and no update path. A single compromise of the host persisted, and fixes never
+arrived.
+
+**Fix, in three layers:**
+
+1. **Signed release, checked on every serve.** The loader ships as a release signed with the PWX
+   release key (`tools/make-release.mjs`, the same signed release `pwx-local` checks itself
+   against, served as `/loader-release.json`). The loader's service worker carries only that
+   public key, pinned by `tools/pin-runtime.mjs`. On first install it verifies the release and
+   every loader file against it. Then, each time it serves a loader file, it re-checks the file
+   against the stored release, and re-verifies the release's signature on every launch. A
+   changed cache entry is replaced from the host only if the host's copy matches; otherwise the
+   loader refuses to start (HTTP 503) and nothing runs.
+2. **Explicit, rollback-proof updates.** The loader never checks for updates on its own, so it
+   still makes no calls home. The user clicks *Check for loader update*. The service worker
+   accepts only a correctly signed release with a higher version, refuses an older one or the
+   same version with different contents, downloads every file, checks each one, and only then
+   switches versions in one step. A release with one bad file is refused whole.
+3. **Warning when the host changes `sw.js`.** The browser re-fetches `sw.js` from the host by
+   itself and no page code can stop that. When it brings a new one, the loader page compares it
+   with the `sw.js` hash in the current and the newest signed release. If neither matches, the
+   loader shows a warning that the host may be compromised.
+
+**What remains (browser limit):** a host that serves a malicious `sw.js` still takes over the
+hosted loader, because the browser installs it; and the layer-3 check is advisory, because a
+hostile host can serve the check a different copy than the browser. That's inherent to loading
+code from a web host. The Verified tier (`pwx-local`) removes the host from the picture: its
+signed release self-check stops it from starting if any file changed.
+
+**Proof:** `tests/loader_update_test.py` plays a hostile host, 13 checks, passing in Chromium,
+Firefox and WebKit:
+
+| Attack | Result |
+| --- | --- |
+| Poison the cached `loader.mjs` | not run; replaced with the signed copy from the host |
+| Poison the cache and have the host serve a tampered `loader.mjs` | refused with 503; nothing runs; recovers once the host serves the signed file |
+| Offer the same release | "up to date" |
+| Offer an older signed release | refused |
+| Offer the same version with different contents | refused |
+| Offer a release signed with another key | refused (signature invalid) |
+| Offer a newer signed release with one wrong file | refused whole; still on the old version |
+| Offer a newer signed release | applied, only after the user clicks Update |
+| Change `sw.js` with no matching signed release | warning shown |
+| Change `sw.js` along with a matching signed release | no warning; update offered |
+
 ## Test results after Stage 2
 
 | Suite | Chromium | Firefox | WebKit |
@@ -116,6 +165,7 @@ checks no notes came back. With the wipe switched off, that test fails in all th
 | Notes (includes the L3 test) | 9/9 | 9/9 | 9/9 |
 | Offline | 6/6 | 6/6 | 5/6 (known, see Open) |
 | Local (pwx-local) | 6/6 | 6/6 | 6/6 |
+| Loader integrity and updates (M6) | 13/13 | 13/13 | 13/13 |
 
 Leak matrix (`tests/run_matrix.sh`, Standard runtime, 36 vectors), shown as blocked / leaked. It's
 the same before and after Stage 2:
@@ -136,8 +186,8 @@ nothing either way.
 
 | ID | Status | Notes |
 | --- | --- | --- |
-| M4 | Open | Spec features not built yet. The details are in the first audit report. |
-| M6 | Open | The details are in the first audit report. |
+| M4 | Open | Protections in the spec aren't built yet: transparency log with witnessed checkpoints, revocation, the key-rotation waiting period, the `sync` capability, device pairing and update policies. Until they are, the threat-table rows that depend on them don't hold. |
+| M6 residue | Browser limit | A host that serves a malicious `sw.js` still takes over the hosted loader; the loader's warning is advisory. Use the Verified tier (`pwx-local`) where that matters. See the M6 fix. |
 | WebKit offline | Open | In hosted mode, opening an installed app still requests `sw.js` for the app and the loader. Only WebKit does this (offline test 5/6). |
 | WebKit leaks | Browser limit | WebRTC and link preconnect leak in WebKit, and it has no switch to stop them. Strict apps aren't affected: they have no DOM and no `RTCPeerConnection`. |
 | Notes migration | Accepted for the spike | Notes saved in the old `pwx-notes` database aren't moved to `pwx-app-store`. |

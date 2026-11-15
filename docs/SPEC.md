@@ -97,7 +97,16 @@ Every install **and every launch** runs the same checks (`verifyPackage`):
 The loader installs, keeps and launches apps.
 
 - **Library:** installed packages are kept on the device in IndexedDB. The loader's service worker
-  caches the loader shell, so installed apps open with no network. The loader makes no calls home.
+  keeps the loader on the device, so installed apps open with no network. The loader makes no calls home.
+- **Loader integrity (hosted tier):** the loader is a release signed with the PWX release key
+  (`/loader-release.json`). Its service worker pins only that public key, verifies every loader
+  file against the release when it installs, and re-checks each file every time it serves it;
+  a file that doesn't match is replaced from the host only with a matching copy, or the loader
+  refuses to start. Updates happen only when the user clicks *Check for loader update*: a higher
+  version, correctly signed, every file verified, then switched in one step. Older versions and
+  same-version swaps are refused. If the browser brings a new `sw.js` that no signed release
+  matches, the loader warns that the host may be compromised. (A host can still replace `sw.js`;
+  only the Verified tier removes that risk.)
 - **Install consent:** before every install or update, the loader shows the app's name, version,
   capabilities and a short **publisher fingerprint**. Nothing installs without a click.
 - **Sideloading:** a `.pwx` file from disk installs through the same verification and consent.
@@ -190,6 +199,9 @@ and per-app origins from the user's own machine.
 | A link turns protections off | test switches exist only in test builds | blocked |
 | Oversized or malicious JSON | strict parser with depth and size limits | blocked |
 | A modified pwx-local install | signed release self-check | blocked |
+| A changed or partial hosted loader (cache or host) | signed release, every file checked on every serve | blocked (AUDIT M6) |
+| A rolled-back or swapped loader update | version must increase; same-version swap refused; updates only on click | blocked (AUDIT M6) |
+| A compromised host replaces the loader's `sw.js` | warning when no signed release matches | **browser limit**: detectable, not preventable in the hosted tier; use pwx-local |
 
 ## 9. Not implemented yet
 
