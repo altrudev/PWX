@@ -27,6 +27,9 @@ done
 
 # Directories we never scan (noise + third-party code).
 PRUNE='-path */.git -o -path */node_modules -o -path */vendor -o -path */dist -o -path */build -o -path */.next -o -path */target'
+# Never scan safeaudit's own files: its pattern list and catalog contain every
+# smell it looks for, so scanning them reports the scanner itself.
+PRUNE="$PRUNE -o -path */safeaudit.sh -o -path */CHECKS.md"
 # Per-repo excludes: one glob per line in .safeauditignore (blank/# ignored).
 # Use it for data/evidence/generated dirs that aren't code (e.g. queue/, *.json
 # evidence) — keep it to non-code, never to hide a real source directory.
