@@ -28,7 +28,7 @@ def run(browser, url, wait_s=6):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--browser", default="chromium")
     a = ap.parse_args()
-    rows, rejected, has_rtc = [], set(), set()
+    rows, rejected, has_rtc, store_leaks = [], set(), set(), []
     with sync_playwright() as p:
         b = getattr(p, a.browser).launch()
         version = b.version
@@ -37,6 +37,10 @@ def main():
             xv, xtcp, st = run(b, f"{LOADER}/?pkg=evil-strict&mode={mode}")
             rep = next((m for m in st.get("messages", []) if m.get("type") == "evil-done"), {})
             rejected |= set(rep.get("rejected", [])); has_rtc.add(rep.get("hasRTC"))
+            # No storage declared: no PwxUI.store, and a hand-made store request is refused.
+            if not rep: store_leaks.append(f"{mode}: no report")
+            elif rep.get("hasStoreApi") or rep.get("rawStoreOk") is not False:
+                store_leaks.append(f"{mode}: api={rep.get('hasStoreApi')} raw={rep.get('rawStoreOk')}")
             for v in rep.get("tried", []):
                 c, x = (ctcp > 0, xtcp > 0) if v in CONNECTION_ONLY else (v in cv, v in xv)
                 rows.append((v, c, x, "LEAK" if x else ("blocked" if c else "untested: control did not leak")))
@@ -46,7 +50,8 @@ def main():
     for v, c, x, r in sorted(rows, key=lambda r: (r[3] != "LEAK", r[3], r[0])):
         print(f"{v:24} {'leak' if c else '-':8} {'leak' if x else '-':8} {r}")
     print(f"renderer rejected: {sorted(rejected)}")
-    leaks = [r[0] for r in rows if r[2]]
+    print(f"undeclared storage: {'refused' if not store_leaks else 'GRANTED ' + str(store_leaks)}")
+    leaks = [r[0] for r in rows if r[2]] + store_leaks
     print("PASS: no vector leaked" if rows and not leaks else f"FAIL: {leaks or 'no rows'}")
     return 0 if rows and not leaks else 1
 

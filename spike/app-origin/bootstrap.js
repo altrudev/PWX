@@ -71,7 +71,10 @@
         headers: { ...headers, "Content-Type": TYPES[ext] ?? "application/octet-stream" },
       }));
     }
-    await pinStore("readwrite", (s) => s.put({ id: manifest.id, publisher: manifest.publisher, version: manifest.version, manifestHash }, "app"));
+    // grants: what the runtime may hand the app, read from the manifest verified just above.
+    // The renderer reads them here, so neither the loader nor the app can widen them.
+    const grants = { storage: manifest.capabilities?.storage?.local === true };
+    await pinStore("readwrite", (s) => s.put({ id: manifest.id, publisher: manifest.publisher, version: manifest.version, manifestHash, grants }, "app"));
   }
 
   // Remove: erase everything the app left on this origin, so the origin can be reused safely.

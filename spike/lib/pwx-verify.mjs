@@ -142,6 +142,13 @@ export function validateManifest(m, opts = {}) {
   connect.forEach((o) => checkOrigin(o, opts));
   need(new Set(connect).size === connect.length, "duplicate origin");
   need(["none", "peer-only", "any", undefined].includes(net.webrtc), "bad network.webrtc");
+  if (caps.storage !== undefined) {
+    const st = caps.storage;
+    need(st && typeof st === "object" && !Array.isArray(st), "storage must be an object");
+    for (const k of Object.keys(st)) need(k === "local" || k === "persistent", `unknown storage key ${k}`);
+    for (const k of ["local", "persistent"]) need(st[k] === undefined || typeof st[k] === "boolean", `storage.${k} must be boolean`);
+    need(!st.persistent || st.local === true, "storage.persistent needs storage.local");
+  }
   for (const k of ["camera", "microphone", "location", "notifications"]) {
     need(caps[k] === undefined || typeof caps[k] === "boolean", `${k} must be boolean`);
   }

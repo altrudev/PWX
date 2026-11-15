@@ -68,7 +68,8 @@ come from a template and are never joined from raw input.
 | `network.webrtc` | `none` (default) · `peer-only` · `any` | `none` adds CSP `webrtc 'block'`; Strict apps never have WebRTC |
 | `camera`, `microphone`, `location` | boolean | Permissions-Policy `(self)` or `()` |
 | `notifications` | boolean | validated only; **not implemented** |
-| `storage`, `files`, `clipboard`, `sync` | object | validated only; **not implemented** (see 6.3) |
+| `storage` | `{ local, persistent }` booleans | Strict: `local` gates `PwxUI.store` (6.3). `persistent` and Standard apps: **not implemented** |
+| `files`, `clipboard`, `sync` | object | validated only; **not implemented** |
 
 `network.connect` rejects IP literals, `localhost` and private-use names (`.local`, `.lan`,
 `.internal`, `.home.arpa`, `.localhost`). An app can't reach the user's machine, home network or
@@ -157,8 +158,8 @@ App code never runs in a document.
   `append`, `remove`, `focus`, `listen`). The renderer applies only allowlisted tags, attributes,
   properties and events (`click`, `input`, `change`, `keydown`). Everything else is rejected and
   recorded.
-- **The app's API** is `self.PwxUI`: `el`, `text`, `attr`, `prop`, `append`, `remove`, `focus`,
-  `mount` and `store`.
+- **The app's API** is `self.PwxUI`: `el`, `text`, `attr`, `prop`, `append`, `remove`, `focus`
+  and `mount`, plus `store` when the manifest declares storage (6.3).
 
 ### 6.3 Storage capability
 
@@ -174,7 +175,16 @@ The renderer serves it from IndexedDB `pwx-app-store` / `kv` on the app's own or
 `{t:"store-result", rid, ok, value | error}`. Keys are strings of 1–256 characters. Values are
 anything structured clone accepts.
 
-**Not implemented:** gating the store on `capabilities.storage`. Today every Strict app gets it.
+**Granted only when declared.** An app gets the store only if its manifest has
+`"storage": { "local": true }`. The bootstrap records this in the origin's pin (`grants.storage`)
+from the manifest it has just verified, at every install and launch. The renderer reads the pin,
+adds `PwxUI.store` to the app's API only when it's granted, and refuses every store request
+otherwise, including ones the app sends by hand. Without the grant, `pwx-app-store` isn't even
+opened. The loader and the app can't change the grant: only the bootstrap writes the pin.
+
+`storage` accepts only the boolean keys `local` and `persistent`, and `persistent` needs `local`.
+**Not implemented:** `persistent` (asking the browser not to evict the data), and gating storage
+for Standard apps, which can use their own origin's IndexedDB directly.
 
 ## 7. Verified tier: pwx-local
 

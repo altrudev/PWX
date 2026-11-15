@@ -150,3 +150,13 @@ test("audit L4: the packer never ships the manifest template or hidden files", a
   const pkg = JSON.parse(await build());
   assert.deepEqual(Object.keys(pkg.files).sort(), ["app/app.js", "app/index.html"]);
 });
+
+test("storage capability: only boolean local/persistent, and persistent needs local", () => {
+  const m = (storage) => ({ ...base, publisher: "ed25519:x", files: { "app/index.html": "sha256-" + "A".repeat(43) + "=" }, capabilities: { storage } });
+  assert.doesNotThrow(() => validateManifest(m({ local: true })));
+  assert.doesNotThrow(() => validateManifest(m({ local: true, persistent: true })));
+  assert.doesNotThrow(() => validateManifest(m({})));
+  for (const bad of [true, [], "yes", { local: "true" }, { local: 1 }, { persistent: true }, { local: true, quota: 5 }, { local: false, persistent: true }]) {
+    assert.throws(() => validateManifest(m(bad)), PwxError, JSON.stringify(bad));
+  }
+});

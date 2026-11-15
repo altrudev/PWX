@@ -38,7 +38,7 @@ declared-host run confirms that declared hosts still work.
 ## First results (week one, Chrome 153, headless)
 
 Current results for all three engines (Chromium, Firefox and WebKit) are in
-[`../docs/AUDIT.md`](../docs/AUDIT.md). Unit tests: 46 of 46 pass as of spike release 0.4.0.
+[`../docs/AUDIT.md`](../docs/AUDIT.md). Unit tests: 47 of 47 pass as of spike release 0.4.1.
 The week-one results, kept for the record:
 
 - Unit tests: 34 of 34 pass.
