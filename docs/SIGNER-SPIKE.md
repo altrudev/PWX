@@ -17,7 +17,7 @@ and `spike/tests/signer_clone_probe.py` (`bash tests/run_signer.sh`).
   reused for anything else. Loaders accept a release only with approvals from 2 distinct devices
   in the key set.
 
-## Results: 14/14 in Chromium 159, Firefox 159 and WebKit 27.2
+## First run (before option 3): 14/14 in Chromium 159, Firefox 159 and WebKit 27.2
 
 | Check | Chromium | Firefox | WebKit |
 | --- | --- | --- | --- |
@@ -34,7 +34,7 @@ and `spike/tests/signer_clone_probe.py` (`bash tests/run_signer.sh`).
 | Deny gives no approval | pass | pass | pass |
 | Tampered package refused before the approval screen | pass | pass | pass |
 
-## The limit this found
+## The limit the first run found
 
 **A copied browser profile can sign with the device key, in all three browsers**
 (`signer_clone_probe.py`). "Non-extractable" protects the key from web code (apps, malicious
@@ -46,7 +46,43 @@ shows the real package before anyone approves. So malware has to take over two o
 devices, as in M4's threat table. But "keys that can't be copied" is only true in the browser
 against web attackers, not against malware.
 
-## Options to close it (for Altru)
+## Option 3, chosen by Altru: PIN-locked browser keys plus hardware keys
+
+### PIN-locked browser keys (built and tested)
+
+- On first run the device makes its key, then stores it **only encrypted**: AES-256-GCM with a key
+  derived from the author's passphrase (PBKDF2-SHA-256, 600,000 iterations, random salt). The
+  usable key is never written to disk.
+- To approve, the author types the passphrase. The key is decrypted into a non-extractable key in
+  memory, signs once, and is dropped. A wrong passphrase fails.
+- Passphrases shorter than 8 characters are refused, because a copied profile can be attacked
+  offline by guessing.
+
+### Hardware keys (format built and tested; chip access not built)
+
+- Security chips (Windows/Linux TPM, Apple Secure Enclave, Android Keystore) sign with **ECDSA
+  P-256**, not Ed25519. Approvals and key sets now name the algorithm, and loaders accept both.
+- Each device in the key set has a **kind**, `pin` or `hardware`. The kind comes from the key set,
+  never from the approval, so a browser key can't pass itself off as hardware.
+- Loaders describe approvals plainly: *"Approved on 2 devices (1 hardware-protected)"*.
+- Not built: `pwx-local` and ALTRU OS actually creating and using a chip key. The test VPS has no
+  TPM, so a non-extractable P-256 browser key stands in for a chip key in the tests. Next step for
+  this part: a small native helper per platform, tested on a real machine (Prometheus, a Mac, an
+  Android phone).
+
+### Results: 20/20 in Chromium 159, Firefox 159 and WebKit 27.2
+
+New checks on top of the 14 above: short passphrase refused; only the encrypted key is stored;
+wrong passphrase can't sign (in code and on the approval screen, which keeps asking); an approval
+claiming another algorithm is rejected; laptop + hardware device accepted and labelled; a browser
+key can't claim to be hardware.
+
+**Copied profile, with option 3:** in all three browsers it **cannot sign without the passphrase**
+(four guesses tried, including another device's passphrase). With the passphrase it can, so the
+passphrase must never be stored on the device, and a stolen profile plus a keylogger is still one
+device: the second-device rule still applies.
+
+## Options considered
 
 1. **PIN-locked browser keys.** Store the device key only encrypted with a key derived from the
    author's PIN or passphrase; unlock it in memory for each approval. A copied profile is useless

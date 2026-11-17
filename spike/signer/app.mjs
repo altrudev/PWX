@@ -11,9 +11,13 @@ async function ask(pkgText, prevPkgText, authorId) {
     .map((t) => Object.assign(document.createElement("li"), { textContent: t })));
   $("card").hidden = false;
   window.signer.shown = summary;
-  const yes = await new Promise((r) => { $("approve").onclick = () => r(true); $("deny").onclick = () => r(false); });
-  $("card").hidden = true;
-  return yes ? device.approve(pkgText, authorId) : null;
+  $("pass").value = ""; $("err").hidden = true;
+  for (;;) {
+    const yes = await new Promise((r) => { $("approve").onclick = () => r(true); $("deny").onclick = () => r(false); });
+    if (!yes) { $("card").hidden = true; return null; }
+    try { const a = await device.approve(pkgText, authorId, $("pass").value); $("card").hidden = true; return a; }
+    catch (e) { $("err").textContent = e.message; $("err").hidden = false; window.signer.lastError = e.message; }
+  }
 }
 window.signer = { ...device, ask, shown: null };
 $("status").textContent = "PWX Signer ready";
