@@ -11,7 +11,7 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".mjs": "text/javascript", 
 const PORT = Number(process.env.SIGNER_PORT ?? 8150);
 http.createServer((req, res) => {
   const path = new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html");
-  const ok = /^\/(lib|signer)\/[\w.-]+$/.test(path) || /^\/packages\/[a-z0-9-]+\.pwx\.json$/.test(path);
+  const ok = /^\/(lib|signer|log)\/[\w.-]+$/.test(path) || /^\/packages\/[a-z0-9-]+\.pwx\.json$/.test(path);
   const file = normalize(join(ROOT, path));
   if (!ok || !file.startsWith(ROOT) || !existsSync(file)) return res.writeHead(404).end();
   res.writeHead(200, { "Content-Type": TYPES[extname(file)] ?? "application/octet-stream", "Cache-Control": "no-store",
