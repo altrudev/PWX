@@ -1,9 +1,10 @@
 # PWX handover
 
-For the next person (or chat) picking up PWX. Last updated 2026-11-16, at spike release **0.4.2**.
+For the next person (or chat) picking up PWX. Last updated 2026-11-17, at spike release **0.4.2**.
 Read [`../README.md`](../README.md) for what PWX is, [`SPEC.md`](SPEC.md) for how it works and
-[`AUDIT.md`](AUDIT.md) for the security record, [`QUARANTINE.md`](QUARANTINE.md) for the next
-design and [`VISION.md`](VISION.md) for where PWX is going. This file covers where things are, how to work on
+[`AUDIT.md`](AUDIT.md) for the security record, [`VISION.md`](VISION.md) for where PWX is going,
+[`M4.md`](M4.md) for the approved signing and log design, [`SIGNER-SPIKE.md`](SIGNER-SPIKE.md) for
+its first spike, and [`QUARANTINE.md`](QUARANTINE.md) for the proposal still awaiting a decision. This file covers where things are, how to work on
 them, and what's next.
 
 ## Where things stand
@@ -17,8 +18,16 @@ them, and what's next.
   down, app origins accept only genuine packages, and erasing needs the user's click. A swapped
   *app-origin* worker can still read that app's data. The PWX Guard extension blocks a swapped
   loader worker, in Chromium only. `pwx-local` has none of these gaps.
-- **Other main open item:** M4. The transparency log, revocation, key rotation with a waiting period,
-  and update policies aren't built. Until they are, a publisher whose key is stolen can't be stopped.
+- **Direction (decided 2026-11-16, [`VISION.md`](VISION.md)):** PWX is an open, signed app format
+  and runtime that runs on everything, not a builder or a store. Hosted is the front door.
+- **M4 (approved design, [`M4.md`](M4.md)):** stop stolen keys with device keys and two-device
+  approval, then a witnessed public log, receipts, revocation, automatic key rotation and update
+  policies. **Built so far:** the Signer spike only. Until the log exists, a publisher whose key
+  is stolen still can't be stopped in the shipped loader.
+- **Signer spike ([`SIGNER-SPIKE.md`](SIGNER-SPIKE.md), `spike/signer/`):** passphrase-locked
+  browser keys, ECDSA P-256 format for hardware keys, two-device approval; 20/20 in all three
+  engines, and a copied browser profile can't sign. Not built: chip access in `pwx-local` /
+  ALTRU OS (the VPS has no TPM). Not used by the loader yet.
 
 ## Where everything lives
 
@@ -41,6 +50,7 @@ All commands run from `spike/` on the VPS.
 node --test tests/verify.test.mjs   # unit tests (any machine with Node)
 bash tests/run_all.sh                # every suite, all engines (~25 min; the matrix is slowest)
 bash audit/run.sh                    # security audit: every exploit must print "blocked"
+bash tests/run_signer.sh             # Signer spike: two-device approval + copied-profile probe
 ../safeaudit.sh ..                   # static scan, same as CI
 ```
 
@@ -84,7 +94,7 @@ tests and `package.json` aren't pinned, so they can change freely.
 - **Strict apps get storage only when declared** (`"storage": { "local": true }`, since 0.4.1).
   Test apps that need storage must declare it.
 
-## Recent work (Nov 15–16, 2026)
+## Recent work (Nov 15–17, 2026)
 
 | PR | Change |
 | --- | --- |
@@ -95,6 +105,9 @@ tests and `package.json` aren't pinned, so they can change freely.
 | #7 | Offline test on a saved profile; the WebKit `sw.js` item was a test-setup artifact |
 | #9 | Erasing an app needs the user's click on the app's own origin (release 0.4.2); PWX Guard extension spike (`spike/extension/`, Chromium) |
 | #10 | `QUARANTINE.md`: proposal for quarantine without an extension, in every browser; this handover |
+| #11 | `VISION.md`: what PWX is for; ownership, earned results, opening .pwx files |
+| #12 | `M4.md`: approved design for the log, revocation, rotation, update policies and the PWX Signer |
+| #13 | Signer spike: two-device approval, passphrase-locked keys, hardware key format (`SIGNER-SPIKE.md`) |
 
 ## Waiting on Altru
 
@@ -110,47 +123,30 @@ GitHub branches are deleted.
 
 ## What's next
 
-**Decisions from 2026-11-16 (recorded in [`VISION.md`](VISION.md)):** PWX is an open format and
-runtime, not a builder or a store; no Assembler app. Apps get push, background sync and offline
-work as capabilities of the shell, so QUARANTINE.md Part 1 must keep those possible. Lineage and
-blessed branches are a new design item, alongside M4. QUARANTINE.md itself is still awaiting
-Altru's approval.
+Decided on 2026-11-16: the vision ([`VISION.md`](VISION.md)), the M4 design with its decisions
+([`M4.md`](M4.md), end of file), and option 3 for signing keys ([`SIGNER-SPIKE.md`](SIGNER-SPIKE.md)).
+QUARANTINE.md is still awaiting Altru's approval: ask before building any of it.
 
-Start here. Altru's question on 2026-11-16 was: how do we get extension-style quarantine without
-an extension, in all browsers? The answer is the proposal in [`QUARANTINE.md`](QUARANTINE.md).
-**None of it is built or tested, and Altru hasn't approved it yet.** Ask before building.
-
-1. **Get Altru's decision on `QUARANTINE.md`,** then run its spikes in this order. Each must pass
-   in Chromium, Firefox and WebKit, using the existing leak matrix, audit exploits and
-   hostile-host tests as the bar.
-   - **Part 1, one origin:** apps in sandboxed opaque frames made by the loader, storage served by
-     the loader. Removes app origins and their workers. This decides the architecture, so do it
-     first, on a branch, without deleting the current per-origin runtime until it passes.
-   - **Part 2, frozen kernel:** the loader's `sw.js` never changes, so any new worker is an attack.
-   - **Part 3, data locked at rest:** data key wrapped by a passkey or passphrase, held only in
-     page memory. Check WebAuthn PRF support in each engine before designing around it.
-   - **Part 4, verifying gateway:** refuse unsigned loader files on the network, for every browser.
-     Pairs with the M4 transparency log.
-2. **M4 design: drafted in [`M4.md`](M4.md), awaiting Altru's decisions** (listed at its end). It covers:
-   - a transparency log every release must appear in
-   - revocation of a compromised key or a bad release
-   - key rotation with a waiting period, so a stolen key can't instantly replace the real one
-   - update policies (who may publish an update, how loaders check)
-3. **PWX Guard extension,** if Altru still wants it after `QUARANTINE.md` (see AUDIT.md, "PWX
-   Guard"): cover app-origin workers (their `sw.js` must first be byte-stable, with no server-side
-   substitution), then a Firefox build that checks the exact bytes the browser receives. Part 1
-   would make the app-origin step unnecessary.
-4. **Erase confirmation:** Firefox and WebKit can't tell whether the box is covered. Part 1 would
-   move this box into the loader, so revisit after that decision.
-5. **Package format.** Keep the PWX manifest and signature as the standard. Later, move the
-   container from base64 JSON to a compact binary format that can be read in parts (no 33% size
-   overhead, no 64 MB limit). Optionally export a Signed Web Bundle for Chrome once Isolated Web
-   Apps can be installed by anyone.
-6. **Production hosting:** a real subdomain per app instead of local ports. Part 1 would remove
-   this need.
-7. **Not implemented yet:** `storage.persistent`, storage limits for Standard apps, and the
-   `files`, `clipboard` and `sync` capabilities (validated only).
-8. Merge `spike` into `main` once M4 is designed and the spec is stable.
+1. **M4 log spike (started 2026-11-17).** A tiled, append-only log on the VPS with two witnesses,
+   receipts inside packages, and the loader checking them. Tests from M4.md: a release missing
+   from the log, a forged receipt, a split view, a revoked release, a rotation inside the waiting
+   period, a recovery-key cancel.
+2. **Hardware keys:** a small native helper for `pwx-local` (TPM on Windows/Linux, Secure Enclave
+   on macOS) and ALTRU OS (Android Keystore), signing ECDSA P-256 approvals in the Signer spike's
+   format. Must be tested on real machines (Prometheus, a Mac, an Android phone), not the VPS.
+3. **PWX Signer app:** turn the spike into the real screen: pairing by QR code, approval card,
+   alerts from the log, one-tap revoke. Simple on the surface.
+4. **Then wire it in:** loaders require two-device approvals and a log receipt (soft mode first,
+   then required), as in M4.md's rollout.
+5. **QUARANTINE.md**, once Altru decides. Part 1 must keep push, background sync and offline work
+   possible as capabilities of the shell (VISION.md). The Signer would live on the same origin.
+6. **VISION.md design items** after the log: lineage and blessings, licenses and ownership
+   transfers, earned credentials, the packer web page, the self-opening .pwx, the iPhone install
+   guide.
+7. **Smaller items:** PWX Guard extension (only if still wanted after QUARANTINE.md); erase
+   confirmation in Firefox and WebKit; binary package format; `storage.persistent`, Standard-app
+   storage limits, and the `files`, `clipboard` and `sync` capabilities (validated only).
+8. Merge `spike` into `main` once the M4 log works and the spec is stable.
 
 ## Side thread, not PWX work
 
