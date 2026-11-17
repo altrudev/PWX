@@ -157,3 +157,4 @@ ended up built into every browser.
    Verifiable Credentials / Open Badges.
 7. **Self-opening .pwx:** an HTML-and-package file whose launcher hands off to the trusted shell;
    File Handling registration in the shell and OS registration in `pwx-local` / ALTRU OS.
+8. **PWX Signer:** a key and approval app on every author device; see [`M4.md`](M4.md), section 8.
