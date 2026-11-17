@@ -131,7 +131,7 @@ an extension, in all browsers? The answer is the proposal in [`QUARANTINE.md`](Q
      page memory. Check WebAuthn PRF support in each engine before designing around it.
    - **Part 4, verifying gateway:** refuse unsigned loader files on the network, for every browser.
      Pairs with the M4 transparency log.
-2. **M4 design, before any code.** A short design for approval covering:
+2. **M4 design: drafted in [`M4.md`](M4.md), awaiting Altru's decisions** (listed at its end). It covers:
    - a transparency log every release must appear in
    - revocation of a compromised key or a bad release
    - key rotation with a waiting period, so a stolen key can't instantly replace the real one
