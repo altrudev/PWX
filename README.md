@@ -22,12 +22,16 @@ PWX moves that trust from the publisher to something you can check:
 
 The goals are privacy, no data loss, and users who own their data.
 
+**Where it's going:** apps anyone can make, share, update and branch, that run on everything,
+and where you always know who made them and what they can do. See [`docs/VISION.md`](docs/VISION.md).
+
 ## Status
 
 Early design, with a working, security-audited spike (spike release 0.4.1). On this branch (`spike`):
 
 - [`docs/SPEC.md`](docs/SPEC.md): **PWX Specification v0 (Draft)**, as built
 - [`docs/AUDIT.md`](docs/AUDIT.md): security audit, fixes and cross-browser results
+- [`docs/VISION.md`](docs/VISION.md): what PWX is for, and the design items that follow from it
 - [`spike/`](spike/): verifier, packer, hosted loader, local Verified-tier loader (`pwx-local`), Strict runtime, a Notes app and the test suites
 
 Every exploit from the audit is blocked in Chromium, Firefox and WebKit. Not built yet: the

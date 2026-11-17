@@ -2,8 +2,8 @@
 
 For the next person (or chat) picking up PWX. Last updated 2026-11-16, at spike release **0.4.2**.
 Read [`../README.md`](../README.md) for what PWX is, [`SPEC.md`](SPEC.md) for how it works and
-[`AUDIT.md`](AUDIT.md) for the security record and [`QUARANTINE.md`](QUARANTINE.md) for the next
-design. This file covers where things are, how to work on
+[`AUDIT.md`](AUDIT.md) for the security record, [`QUARANTINE.md`](QUARANTINE.md) for the next
+design and [`VISION.md`](VISION.md) for where PWX is going. This file covers where things are, how to work on
 them, and what's next.
 
 ## Where things stand
@@ -109,6 +109,12 @@ Done on 2026-11-16: the old VPS copies (`~/_to_delete/pwx-spike`, `~/pwx-audit`)
 GitHub branches are deleted.
 
 ## What's next
+
+**Decisions from 2026-11-16 (recorded in [`VISION.md`](VISION.md)):** PWX is an open format and
+runtime, not a builder or a store; no Assembler app. Apps get push, background sync and offline
+work as capabilities of the shell, so QUARANTINE.md Part 1 must keep those possible. Lineage and
+blessed branches are a new design item, alongside M4. QUARANTINE.md itself is still awaiting
+Altru's approval.
 
 Start here. Altru's question on 2026-11-16 was: how do we get extension-style quarantine without
 an extension, in all browsers? The answer is the proposal in [`QUARANTINE.md`](QUARANTINE.md).
