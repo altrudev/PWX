@@ -2,7 +2,8 @@
 
 For the next person (or chat) picking up PWX. Last updated 2026-11-16, at spike release **0.4.2**.
 Read [`../README.md`](../README.md) for what PWX is, [`SPEC.md`](SPEC.md) for how it works and
-[`AUDIT.md`](AUDIT.md) for the security record. This file covers where things are, how to work on
+[`AUDIT.md`](AUDIT.md) for the security record and [`QUARANTINE.md`](QUARANTINE.md) for the next
+design. This file covers where things are, how to work on
 them, and what's next.
 
 ## Where things stand
@@ -12,7 +13,11 @@ them, and what's next.
 - **Tests:** all suites pass in all three engines (47 unit tests); the PWX Guard extension spike passes in Chromium. The leak matrix is unchanged:
   without the extra protections, the Standard runtime leaks WebRTC in every engine, plus link
   preconnect in WebKit, which has no switch to stop either. That's a browser limit (see AUDIT.md).
-- **Main open item:** M4. The transparency log, revocation, key rotation with a waiting period,
+- **Hosted tier, honestly:** a compromised host can still swap a service worker. The loader locks
+  down, app origins accept only genuine packages, and erasing needs the user's click. A swapped
+  *app-origin* worker can still read that app's data. The PWX Guard extension blocks a swapped
+  loader worker, in Chromium only. `pwx-local` has none of these gaps.
+- **Other main open item:** M4. The transparency log, revocation, key rotation with a waiting period,
   and update policies aren't built. Until they are, a publisher whose key is stolen can't be stopped.
 
 ## Where everything lives
@@ -89,6 +94,7 @@ tests and `package.json` aren't pinned, so they can change freely.
 | #6 | Strict apps get `PwxUI.store` only when the manifest declares storage (release 0.4.1) |
 | #7 | Offline test on a saved profile; the WebKit `sw.js` item was a test-setup artifact |
 | #9 | Erasing an app needs the user's click on the app's own origin (release 0.4.2); PWX Guard extension spike (`spike/extension/`, Chromium) |
+| #10 | `QUARANTINE.md`: proposal for quarantine without an extension, in every browser; this handover |
 
 ## Waiting on Altru
 
@@ -104,24 +110,46 @@ GitHub branches are deleted.
 
 ## What's next
 
-1. **M4 design, before any code.** Write a short design for approval covering:
+Start here. Altru's question on 2026-11-16 was: how do we get extension-style quarantine without
+an extension, in all browsers? The answer is the proposal in [`QUARANTINE.md`](QUARANTINE.md).
+**None of it is built or tested, and Altru hasn't approved it yet.** Ask before building.
+
+1. **Get Altru's decision on `QUARANTINE.md`,** then run its spikes in this order. Each must pass
+   in Chromium, Firefox and WebKit, using the existing leak matrix, audit exploits and
+   hostile-host tests as the bar.
+   - **Part 1, one origin:** apps in sandboxed opaque frames made by the loader, storage served by
+     the loader. Removes app origins and their workers. This decides the architecture, so do it
+     first, on a branch, without deleting the current per-origin runtime until it passes.
+   - **Part 2, frozen kernel:** the loader's `sw.js` never changes, so any new worker is an attack.
+   - **Part 3, data locked at rest:** data key wrapped by a passkey or passphrase, held only in
+     page memory. Check WebAuthn PRF support in each engine before designing around it.
+   - **Part 4, verifying gateway:** refuse unsigned loader files on the network, for every browser.
+     Pairs with the M4 transparency log.
+2. **M4 design, before any code.** A short design for approval covering:
    - a transparency log every release must appear in
    - revocation of a compromised key or a bad release
    - key rotation with a waiting period, so a stolen key can't instantly replace the real one
    - update policies (who may publish an update, how loaders check)
-2. **PWX Guard extension, from spike to something usable** (see AUDIT.md, "PWX Guard"). In order:
-   - make the app origins' `sw.js` byte-stable (no server-side substitution) and cover it, since
-     that is what protects app data from a compromised host
-   - a Firefox build that checks the exact bytes the browser receives, closing the timing gap
-   - decide whether the extension should become the loader itself (no host to trust at all)
-3. **Erase confirmation:** Firefox and WebKit can't tell whether the box is covered. Look for a
-   stronger defence against a tricked click there.
-4. **Package format.** Keep the PWX manifest and signature as the standard. Later, move the
+3. **PWX Guard extension,** if Altru still wants it after `QUARANTINE.md` (see AUDIT.md, "PWX
+   Guard"): cover app-origin workers (their `sw.js` must first be byte-stable, with no server-side
+   substitution), then a Firefox build that checks the exact bytes the browser receives. Part 1
+   would make the app-origin step unnecessary.
+4. **Erase confirmation:** Firefox and WebKit can't tell whether the box is covered. Part 1 would
+   move this box into the loader, so revisit after that decision.
+5. **Package format.** Keep the PWX manifest and signature as the standard. Later, move the
    container from base64 JSON to a compact binary format that can be read in parts (no 33% size
    overhead, no 64 MB limit). Optionally export a Signed Web Bundle for Chrome once Isolated Web
-   Apps can be installed by anyone. Signed Web Bundles are Chrome-only, and Google controls an
-   allowlist for managed installs.
-5. **Production hosting:** a real subdomain per app instead of the local ports the spike uses.
-6. **Not implemented yet:** `storage.persistent`, storage limits for Standard apps, and the
+   Apps can be installed by anyone.
+6. **Production hosting:** a real subdomain per app instead of local ports. Part 1 would remove
+   this need.
+7. **Not implemented yet:** `storage.persistent`, storage limits for Standard apps, and the
    `files`, `clipboard` and `sync` capabilities (validated only).
-7. Merge `spike` into `main` once M4 is designed and the spec is stable.
+8. Merge `spike` into `main` once M4 is designed and the spec is stable.
+
+## Side thread, not PWX work
+
+Altru built an email and bookings PWA and reports that an in-app button installed it on a
+friend's iPhone with one confirmation. Public sources say Safari has no install prompt, so the
+mechanism is unknown. `mindgrowthvalley.com` is the public site only (no manifest, no service
+worker); the app's address or code hasn't been shared. If it turns out to be a real one-tap
+iPhone install, it matters for PWX's hosted tier on iOS.
