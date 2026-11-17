@@ -147,7 +147,7 @@ ended up built into every browser.
 
 1. **Lineage and blessings:** manifest fields for `forkedFrom` (id, version, publisher, manifest
    hash), co-signatures for blessed branches, and how the loader shows the family tree. Pairs
-   with the M4 transparency log, which makes the history impossible to rewrite.
+   with the M4 transparency log ([`M4.md`](M4.md)), which makes the history impossible to rewrite.
 2. **Packer for everyone:** a web page that packs and signs a folder in the browser, with the key
    kept on the author's device.
 3. **Licenses:** a signed, offline-checkable license format (buy, earn, gift, lend, expire).
