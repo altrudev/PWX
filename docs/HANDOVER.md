@@ -29,6 +29,8 @@ them, and what's next.
   engines, and a copied browser profile can't sign. Not built: chip access in `pwx-local` /
   ALTRU OS (the VPS has no TPM). Not used by the loader yet.
 
+**Live demo:** [pwx.altru.dev](https://pwx.altru.dev), release 0.4.3, since 2026-11-17.
+
 ## Where everything lives
 
 | What | Where |
@@ -39,6 +41,7 @@ them, and what's next.
 | Signing keys | VPS only: `~/.config/pwx-dev/dev-key.json` and `release-key.json` (never in the repo) |
 | Python venv with Playwright and browsers | VPS: `~/PWX/spike/.venv` (gitignored) |
 | Prometheus | nothing PWX-related |
+| Live demo | WHC cPanel (`ssh whc` from the VPS): `~/pwx.altru.dev` (loader, pwx.altru.dev) and `~/pwx-apps.altru.dev` (shared by app1-app4.pwx.altru.dev, one private storage area per app) |
 
 Browser tests and anything that signs must run on the VPS: it has the browsers and the keys.
 
@@ -68,6 +71,21 @@ node tools/make-release.mjs          # signs local/release.json with the release
 
 Commit `VERSION`, `app-origin/sw.js` and `local/release.json` together with the change. Docs,
 tests and `package.json` aren't pinned, so they can change freely.
+
+### Updating the live demo
+
+After a new signed release:
+
+```bash
+node tools/build-site.mjs https://pwx.altru.dev /tmp/pwx-site
+rsync -a --delete /tmp/pwx-site/loader/ whc:pwx.altru.dev/
+rsync -a --delete /tmp/pwx-site/apps/ whc:pwx-apps.altru.dev/
+.venv/bin/python tests/live_demo_test.py --browser chromium   # then firefox, webkit
+```
+
+`build-site.mjs` writes the `.htaccess` files that give the same headers as `server/serve.mjs`
+(CSP, frame-only pages refused as a tab, keys and hidden files refused). App hosts follow from
+the loader's address (`app1`-`app4` + its host), so the signed files are the same everywhere.
 
 ### Git and GitHub
 
@@ -111,12 +129,9 @@ tests and `package.json` aren't pinned, so they can change freely.
 
 ## Waiting on Altru
 
-1. **Back up the signing keys.** On the VPS, choosing your own passphrase:
-   `tar -C ~/.config -c pwx-dev | gpg -c --cipher-algo AES256 -o ~/pwx-keys.tar.gpg`.
-   Copy the file to Prometheus and a USB stick, then delete it from the VPS. Restore with
-   `gpg -d pwx-keys.tar.gpg | tar -x -C ~/.config`.
-2. **Turn on private vulnerability reporting:** repo Settings → Security → Private vulnerability
-   reporting → Enable. SECURITY.md tells people to use it.
+Nothing right now. Done on 2026-11-17: the signing keys are backed up (an encrypted
+`pwx-keys.asc` on Altru's phone; a second copy off the phone is still recommended; restore with
+`gpg -d pwx-keys.asc | tar -xz -C ~/.config`), and private vulnerability reporting is on.
 
 Done on 2026-11-16: the old VPS copies (`~/_to_delete/pwx-spike`, `~/pwx-audit`) and the merged
 GitHub branches are deleted.

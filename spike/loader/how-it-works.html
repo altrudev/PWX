@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How PWX works</title>
+<meta name="description" content="What PWX is for, what's inside a PWX app, how it's checked, why each app gets its own private storage, and how to try it.">
+<link rel="stylesheet" href="/loader.css"></head>
+<body class="doc">
+<header class="bar">
+  <a class="mark" href="/">PWX</a>
+  <nav><a href="/">Demo</a><a href="https://github.com/altrudev/PWX">GitHub</a></nav>
+</header>
+
+<main>
+<section class="doc-head">
+  <h1>How PWX works</h1>
+  <p class="lede">The short version: an app is a signed package. Your device checks it before it runs,
+  and the browser holds it to what it declared. Here's the longer version, with pictures.</p>
+  <nav class="toc" aria-label="On this page">
+    <a href="#vision">Why PWX</a><a href="#inside">What's inside</a><a href="#open">Opening an app</a>
+    <a href="#rooms">Private storage</a><a href="#use">Using the demo</a><a href="#make">Making an app</a>
+    <a href="#limits">Limits today</a><a href="#join">Get involved</a>
+  </nav>
+</section>
+
+<section id="vision" class="doc-sec">
+  <h2>Why PWX exists</h2>
+  <p class="big">Using an app today means trusting whoever made it, and whoever sells it to you.</p>
+  <p>A privacy policy is a promise. Nothing stops an app from sending your data somewhere else, changing
+  after you install it, or disappearing with everything you put into it. App stores decide what you may
+  run, on which devices, and take a cut of everything sold.</p>
+  <p>PWX replaces the promise with something you can check. Its purpose is <strong>privacy, no data
+  loss, and people who own their software and their data.</strong></p>
+
+  <h3>Where it's going</h3>
+  <p class="goal">Apps anyone can make, share, update and branch, that run on everything, and where you
+  always know who made them and what they can do.</p>
+  <ul class="checks">
+    <li><strong>An open format, not a store.</strong> PWX is a way to package, sign and run apps, like PDF
+    is for documents. Build however you like, by hand or with AI, then pack and sign.</li>
+    <li><strong>One app, every device.</strong> The same file runs on phones, tablets and computers: from a
+    link, installed on the home screen, or as a file you keep.</li>
+    <li><strong>Branch anything, see where it came from.</strong> Anyone can take an app and change it.
+    Every version records what it was branched from, so you always know who made what.</li>
+    <li><strong>Owned like an object.</strong> Bought, earned, gifted or lent, recorded in a public log
+    instead of a company's database.</li>
+    <li><strong>Safe for AI-made software.</strong> An app an AI wrote can still only do what its signed
+    manifest says.</li>
+  </ul>
+  <p class="fine">Most of this is designed and partly built; see <a href="#limits">limits today</a>. The full
+  plan is in <a href="https://github.com/altrudev/PWX/blob/spike/docs/VISION.md">VISION.md</a>.</p>
+</section>
+
+<section id="inside" class="doc-sec">
+  <h2>What's inside a PWX app</h2>
+  <p>One package holds three things. Change any byte of any of them and the package is refused.</p>
+  <figure class="diagram">
+    <svg viewBox="0 0 760 300" role="img" aria-labelledby="inside-t">
+      <title id="inside-t">A PWX package: a manifest, a signature over it, and the app's files, each matched by a fingerprint in the manifest.</title>
+      <rect x="10" y="10" width="740" height="280" rx="16" class="d-box dash"/>
+      <text x="30" y="42" class="d-label">notes.pwx</text>
+      <rect x="30" y="64" width="300" height="200" rx="10" class="d-card"/>
+      <text x="48" y="94" class="d-title">Manifest</text>
+      <text x="48" y="124" class="d-text">Name, version</text>
+      <text x="48" y="150" class="d-text">May contact: nobody</text>
+      <text x="48" y="176" class="d-text">May store data: on this device</text>
+      <text x="48" y="202" class="d-text">Fingerprint of every file</text>
+      <text x="48" y="228" class="d-text">Maker's public key</text>
+      <rect x="370" y="64" width="160" height="90" rx="10" class="d-card seal-fill"/>
+      <text x="388" y="94" class="d-title">Signature</text>
+      <text x="388" y="122" class="d-text">by the maker's key,</text>
+      <text x="388" y="142" class="d-text">over the manifest</text>
+      <defs><marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker></defs>
+      <path d="M370 110 H336" class="d-arrow" marker-end="url(#ah1)"/>
+      <text x="331" y="98" class="d-small">signs</text>
+      <rect x="560" y="64" width="170" height="200" rx="10" class="d-card"/>
+      <text x="578" y="94" class="d-title">Files</text>
+      <text x="578" y="124" class="d-mono">main.js</text>
+      <text x="578" y="150" class="d-mono">ui.css</text>
+      <text x="578" y="176" class="d-mono">icon.svg</text>
+      <text x="578" y="202" class="d-mono">…</text>
+      <path d="M560 200 H336" class="d-arrow" marker-end="url(#ah1)"/>
+      <text x="372" y="226" class="d-small">every file must match</text>
+    </svg>
+  </figure>
+</section>
+
+<section id="open" class="doc-sec">
+  <h2>What happens when you open an app</h2>
+  <p>Every time, not just at install. If any answer is no, the app doesn't run and you're told why.</p>
+  <figure class="diagram">
+    <svg viewBox="0 0 760 320" role="img" aria-labelledby="open-t">
+      <title id="open-t">Checks in order: is it signed by its maker, are the files unchanged, is it the same maker as before, is it newer. Then you're asked, then it runs sealed. Any no means refused.</title>
+      <defs>
+        <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker>
+        <marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head-no"/></marker>
+      </defs>
+      <g class="d-flow">
+        <rect x="10" y="20" width="160" height="70" rx="12" class="d-card"/><text x="90" y="52" class="d-c">Signed by</text><text x="90" y="74" class="d-c">its maker?</text>
+        <rect x="200" y="20" width="160" height="70" rx="12" class="d-card"/><text x="280" y="52" class="d-c">Files</text><text x="280" y="74" class="d-c">unchanged?</text>
+        <rect x="390" y="20" width="160" height="70" rx="12" class="d-card"/><text x="470" y="52" class="d-c">Same maker</text><text x="470" y="74" class="d-c">as before?</text>
+        <rect x="580" y="20" width="160" height="70" rx="12" class="d-card"/><text x="660" y="52" class="d-c">Not an older</text><text x="660" y="74" class="d-c">version?</text>
+        <path d="M170 55 H198" class="d-arrow" marker-end="url(#ah2)"/><path d="M360 55 H388" class="d-arrow" marker-end="url(#ah2)"/><path d="M550 55 H578" class="d-arrow" marker-end="url(#ah2)"/>
+        <text x="174" y="46" class="d-small">yes</text><text x="364" y="46" class="d-small">yes</text><text x="554" y="46" class="d-small">yes</text>
+        <path d="M690 90 V150" class="d-arrow" marker-end="url(#ah2)"/><text x="698" y="126" class="d-small">yes</text>
+        <rect x="500" y="152" width="240" height="58" rx="12" class="d-card ask"/><text x="620" y="177" class="d-c">You see what it can do</text><text x="620" y="198" class="d-c">and choose Install</text>
+        <path d="M620 210 V244" class="d-arrow" marker-end="url(#ah2)"/>
+        <rect x="500" y="246" width="240" height="58" rx="12" class="d-card run"/><text x="620" y="271" class="d-c b">It runs, sealed off,</text><text x="620" y="292" class="d-c b">with only what it declared</text>
+        <path d="M90 90 V125" class="d-no"/><path d="M280 90 V125" class="d-no"/><path d="M470 90 V125" class="d-no"/><path d="M630 90 V125" class="d-no"/>
+        <path d="M630 125 H90" class="d-no"/><path d="M130 125 V244" class="d-no" marker-end="url(#ah3)"/>
+        <text x="300" y="145" class="d-small">any no</text>
+        <rect x="20" y="246" width="230" height="58" rx="12" class="d-card stop"/><text x="135" y="271" class="d-c">Refused, and you're</text><text x="135" y="292" class="d-c">told which check failed</text>
+      </g>
+    </svg>
+  </figure>
+</section>
+
+<section id="rooms" class="doc-sec">
+  <h2>Each app gets its own private storage</h2>
+  <p>Browsers keep each web address's data in its own locked drawer. So the demo gives every app its own
+  address: <strong>app1</strong> to <strong>app4.pwx.altru.dev</strong>. You never visit those
+  directly; this page opens apps there, inside a sealed frame. One app can't read another's notes, and
+  app code can't touch the PWX runtime.</p>
+  <figure class="diagram">
+    <svg viewBox="0 0 760 270" role="img" aria-labelledby="rooms-t">
+      <title id="rooms-t">The loader at pwx.altru.dev opens each app in a sealed frame on its own address, app1 to app4, each with its own storage. Walls between apps block access.</title>
+      <rect x="10" y="10" width="740" height="250" rx="16" class="d-box"/>
+      <text x="30" y="42" class="d-title">pwx.altru.dev, the loader you see</text>
+      <text x="30" y="66" class="d-text">checks apps, keeps your library, asks before installing</text>
+      <g>
+        <rect x="30" y="92" width="160" height="148" rx="12" class="d-card"/><text x="110" y="120" class="d-c b">Notes</text><text x="110" y="142" class="d-c d-mono-s">app3.pwx.altru.dev</text>
+        <rect x="56" y="162" width="108" height="56" rx="8" class="d-store"/><text x="110" y="195" class="d-c">its data</text>
+        <rect x="210" y="92" width="160" height="148" rx="12" class="d-card"/><text x="290" y="120" class="d-c b">Another app</text><text x="290" y="142" class="d-c d-mono-s">app1.pwx.altru.dev</text>
+        <rect x="236" y="162" width="108" height="56" rx="8" class="d-store"/><text x="290" y="195" class="d-c">its data</text>
+        <rect x="390" y="92" width="160" height="148" rx="12" class="d-card dash"/><text x="470" y="166" class="d-c">free</text>
+        <rect x="570" y="92" width="160" height="148" rx="12" class="d-card dash"/><text x="650" y="166" class="d-c">free</text>
+        <line x1="200" y1="100" x2="200" y2="232" class="d-wall"/><line x1="380" y1="100" x2="380" y2="232" class="d-wall"/>
+        <line x1="560" y1="100" x2="560" y2="232" class="d-wall"/>
+      </g>
+    </svg>
+  </figure>
+  <p class="fine">Four addresses is the smallest setup that works today. A planned change runs every app in
+  a sealed box on one address, after which these extra addresses go away.</p>
+</section>
+
+<section id="offline" class="doc-sec">
+  <h2>On your device, even offline</h2>
+  <p>Installed apps and their data live on your device. Opening an app sends nothing to any server, and
+  works with no connection at all. The loader itself is a signed release: your browser keeps a verified
+  copy and checks it again every time it's used.</p>
+</section>
+
+<section id="use" class="doc-sec">
+  <h2>Using the demo</h2>
+  <ol class="howto">
+    <li><strong>Open <a href="/">pwx.altru.dev</a></strong> and choose <em>Try the Notes app</em>.</li>
+    <li><strong>Read what it can do</strong> and who made it, then choose <em>Install</em>. Nothing installs
+    until you do.</li>
+    <li><strong>Write a note.</strong> It's saved on this device only.</li>
+    <li><strong>Come back any time:</strong> Notes is in <em>Your apps</em>, and opens offline.</li>
+    <li><strong>On a phone:</strong> use your browser's <em>Add to Home Screen</em> to keep PWX like an
+    app. On iPhone that's Share, then Add to Home Screen.</li>
+    <li><strong>Remove</strong> erases the app and everything it stored, after you confirm.</li>
+    <li><strong>Have a .pwx file?</strong> <em>Install from a .pwx file</em> runs the same checks.</li>
+  </ol>
+</section>
+
+<section id="make" class="doc-sec">
+  <h2>Making a PWX app</h2>
+  <p>Any web app works as a starting point. Write a manifest that says what it may do, then pack and
+  sign it. The tools are in the <a href="https://github.com/altrudev/PWX/tree/spike/spike">spike folder
+  on GitHub</a> (<code>tools/pack.mjs</code>); the format is in
+  <a href="https://github.com/altrudev/PWX/blob/spike/docs/SPEC.md">SPEC.md</a>. A simpler packer for
+  everyone, and signing with two of your devices, are in progress.</p>
+</section>
+
+<section id="limits" class="doc-sec">
+  <h2>Limits today, plainly</h2>
+  <ul class="checks">
+    <li><strong>This is an early demo.</strong> Don't keep important data here yet.</li>
+    <li><strong>The hosted demo trusts its web host for the page itself.</strong> App files are checked on
+    your device, and the loader locks itself if its host swaps it, but a host can still change what this
+    page is. The local version, <code>pwx-local</code>, doesn't have this gap.</li>
+    <li><strong>Some browsers leak a little for standard apps.</strong> WebRTC in every browser, and link
+    preconnect in Safari, can't be fully blocked for apps that use the page directly. Strict apps, like
+    Notes, avoid both.</li>
+    <li><strong>A stolen maker key can't be stopped yet.</strong> The public log, revocation and two-device
+    signing that fix this are designed and prototyped, not yet in the demo.</li>
+  </ul>
+  <p class="fine">Every claim here is tested: see the <a href="https://github.com/altrudev/PWX/blob/spike/docs/AUDIT.md">security audit</a>.</p>
+</section>
+
+<section id="join" class="doc-sec">
+  <h2>Get involved</h2>
+  <p>PWX is open source (Apache-2.0) and looking for people who want apps without gatekeepers:
+  builders, designers, security researchers, and anyone who'd try to break it.</p>
+  <p class="actions"><a class="btn primary" href="https://github.com/altrudev/PWX">See the code on GitHub</a>
+    <a class="btn quiet" href="https://github.com/altrudev/PWX/security/advisories/new">Report a security problem privately</a></p>
+</section>
+</main>
+
+<footer class="foot">
+  <p><strong>PWX</strong> by <a href="https://altru.dev">ALTRU.dev</a>, Code for Humanity. <a href="/">Back to the demo</a>.</p>
+</footer>
+</body></html>

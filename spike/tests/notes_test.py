@@ -65,6 +65,7 @@ def main():
         page.wait_for_function("() => window.__pwx.phase === 'remove-cancelled'", timeout=15000)
         check("cancelled remove keeps the app", page.get_by_role("button", name="Remove Notes", exact=True).count() == 1)
         page.get_by_role("button", name="Remove Notes", exact=True).click()
+        expect(box.get_by_role("button", name="Erase this app and its data")).to_be_enabled(timeout=15000)
         box.get_by_role("button", name="Erase this app and its data").click(timeout=15000)
         # The page is already on the library before the click, so wait for the list itself to change.
         try:
