@@ -5,7 +5,7 @@ the host sees when the user opens an installed app. Then the host is shut down a
 browser is put offline: the library, Notes and its data must still work, and a tampered
 local copy must be rejected. Starts and stops its own servers.
 Usage: .venv/bin/python tests/offline_test.py --browser chromium|firefox|webkit"""
-import argparse, json, subprocess, sys, time, urllib.request
+import argparse, json, shutil, subprocess, sys, tempfile, time, urllib.request
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 
@@ -34,8 +34,12 @@ def main():
     time.sleep(1)
     try:
         with sync_playwright() as p:
-            b = getattr(p, a.browser).launch(); version = b.version
-            ctx = b.new_context(); page = ctx.new_page(); app = page.frame_locator("iframe.app")
+            # A saved profile, like a real browser. Playwright's default temporary profile has a
+            # stripped-down HTTP cache in WebKit, which re-requests sw.js on every launch.
+            profile = tempfile.mkdtemp(prefix="pwx-offline-")
+            ctx = getattr(p, a.browser).launch_persistent_context(profile); b = ctx.browser
+            version = b.version if b else "(saved profile)"
+            page = ctx.pages[0] if ctx.pages else ctx.new_page(); app = page.frame_locator("iframe.app")
             # --- online: install, use, sideload ---
             page.goto(f"{LOADER}/?pkg=notes"); page.wait_for_function(running, timeout=15000)
             app.get_by_role("button", name="New note").click()
@@ -71,7 +75,7 @@ def main():
             page.goto(f"{LOADER}/?open=org.example.notes"); page.wait_for_function(running, timeout=15000)
             st = page.evaluate("() => ({ phase: window.__pwx.phase, error: window.__pwx.error })")
             check("tampered local copy rejected offline", st == {"phase": "rejected", "error": "signature"}, str(st))
-            b.close()
+            ctx.close(); shutil.rmtree(profile, ignore_errors=True)
     except Exception as e:
         check(f"no errors ({type(e).__name__})", False, str(e).splitlines()[0][:200])
     finally:
