@@ -65,8 +65,35 @@ async function askSw(type) {
   });
 }
 const updateMsg = (t, cls = "") => { $("update-msg").textContent = t; $("update-msg").className = cls; };
+// The page and its worker come from the same signed release, but the browser swaps in a new
+// sw.js only when its own cache allows (up to a day). After an update, fetch sw.js past that
+// cache and let the browser install it now. The usual check (checkServiceWorkerChange) still
+// locks the loader if that sw.js isn't the one the signed release names.
+const WORKER = 2;
+async function refreshWorker() {
+  try {
+    await fetch("/sw.js", { cache: "reload" });
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) return false;
+    const took = new Promise((resolve) => {
+      navigator.serviceWorker.addEventListener("controllerchange", () => resolve(true), { once: true });
+      setTimeout(() => resolve(false), 15000);
+    });
+    await reg.update();
+    return (reg.installing || reg.waiting) ? await took : false;
+  } catch { return false; }
+}
 async function showLoaderVersion() {
   const s = await askSw("status");
+  if (s.ok && s.worker !== WORKER && !state.locked) {
+    let tried = null;
+    try { tried = sessionStorage.getItem("pwx-worker-refresh"); } catch {}
+    if (tried !== s.version) {
+      try { sessionStorage.setItem("pwx-worker-refresh", s.version); } catch {}
+      status("Finishing the loader update…");
+      if (await refreshWorker() && !state.locked) return location.reload();
+    }
+  }
   state.loaderVersion = s.ok ? s.version : null;
   $("loader-version").textContent = s.ok ? `Loader ${s.version} (signed release).` : `Loader integrity: ${s.error}.`;
   $("loader-update").hidden = false;
@@ -84,7 +111,9 @@ $("update-apply").addEventListener("click", async () => {
   updateMsg("Downloading the update and checking every file against its signature…");
   const r = (state.loaderApply = await askSw("apply-update"));
   if (!r.ok) return updateMsg(`Update refused: ${r.error}. You're still on ${state.loaderVersion}.`, "error");
-  location.reload();
+  updateMsg("Installing the updated loader…");
+  await refreshWorker();
+  if (!state.locked) location.reload();
 });
 // The browser re-fetches sw.js from the host by itself and can't be stopped. When it brings a
 // new one, compare it with what a signed release says sw.js should be, and say so if it isn't.
