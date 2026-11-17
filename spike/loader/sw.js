@@ -108,6 +108,77 @@ async function serve(path) {
   if (!body) return integrityError(`${file} doesn't match signed release ${cur.release.version}, and the host didn't provide a copy that does.`);
   return new Response(body, { headers: headersFor(file) });
 }
+// ---------- per-app install files ----------
+// Read-only look at the loader's library (the same IndexedDB the page uses). Only the name the
+// user saw at install time is used; the app itself is verified again every time it opens.
+function libraryRecord(id) {
+  return new Promise((resolve) => {
+    const r = indexedDB.open("pwx-loader", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("packages", { keyPath: "id" });
+    r.onerror = () => resolve(null);
+    r.onsuccess = () => {
+      const db = r.result;
+      try {
+        const q = db.transaction("packages", "readonly").objectStore("packages").get(id);
+        q.onsuccess = () => { db.close(); resolve(q.result ?? null); };
+        q.onerror = () => { db.close(); resolve(null); };
+      } catch { db.close(); resolve(null); }
+    };
+  });
+}
+const NAVY = "#1E1A2E", CORAL = "#E8836A", PAPER = "#FFFFFF";
+async function appIcon(name, size, maskable) {
+  if (typeof OffscreenCanvas !== "function") return null;
+  const c = new OffscreenCanvas(size, size), g = c.getContext("2d"), s = size / 512;
+  g.fillStyle = NAVY;
+  if (maskable) g.fillRect(0, 0, size, size);
+  else { g.beginPath(); g.roundRect(0, 0, size, size, 112 * s); g.fill(); }
+  // The PWX box, with the app's initial inside it.
+  g.strokeStyle = CORAL; g.lineWidth = 32 * s;
+  g.beginPath(); g.roundRect(136 * s, 136 * s, 240 * s, 240 * s, 44 * s); g.stroke();
+  g.fillStyle = PAPER; g.textAlign = "center"; g.textBaseline = "middle";
+  g.font = `700 ${150 * s}px system-ui, sans-serif`;
+  g.fillText((Array.from(name.trim())[0] ?? "?").toUpperCase(), 256 * s, 264 * s);
+  return c.convertToBlob({ type: "image/png" });
+}
+async function appInstallFile(id, file, size) {
+  const record = await libraryRecord(id);
+  if (!record) return new Response("not installed", { status: 404 });
+  const name = String(record.name ?? id).slice(0, 40);
+  const home = `/app/${id}/`;
+  if (file === "manifest.webmanifest") {
+    return new Response(JSON.stringify({
+      name, short_name: name.slice(0, 12), description: `${name}, a signed PWX app. It opens through the PWX loader, which checks it every time.`,
+      id: home, start_url: /^[a-z0-9-]+$/.test(record.source ?? "") ? `${home}?src=${record.source}` : home, scope: home, display: "standalone", background_color: NAVY, theme_color: NAVY,
+      icons: [
+        { src: `${home}icon-192.png`, sizes: "192x192", type: "image/png" },
+        { src: `${home}icon-512.png`, sizes: "512x512", type: "image/png" },
+        { src: `${home}icon-maskable.png`, sizes: "512x512", type: "image/png", purpose: "maskable" },
+      ],
+    }), { headers: { "Content-Type": "application/manifest+json" } });
+  }
+  const px = size === "maskable" ? 512 : Number(size);
+  const png = await appIcon(name, px, size === "maskable" || size === "180");
+  if (png) return new Response(png, { headers: { "Content-Type": "image/png" } });
+  return serve(px >= 512 ? "/icons/icon-512.png" : size === "180" ? "/icons/apple-touch-icon.png" : "/icons/icon-192.png");
+}
+
+// An app's home page is the verified loader page, pointed at that app's own install manifest,
+// icon and name, so the home screen shows the app rather than the library.
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+async function serveAppPage(id) {
+  const res = await serve("/");
+  const record = res.ok ? await libraryRecord(id) : null;
+  if (!record) return res;
+  const name = esc(String(record.name ?? id).slice(0, 40)), home = `/app/${id}/`;
+  const html = (await res.text())
+    .replace('href="/manifest.webmanifest"', `href="${home}manifest.webmanifest"`)
+    .replace('href="/icons/apple-touch-icon.png"', `href="${home}icon-180.png"`)
+    .replace('content="PWX">', `content="${name}">`)
+    .replace(/<title>[^<]*<\/title>/, `<title>${name}</title>`);
+  return new Response(html, { headers: res.headers });
+}
+
 const integrityError = (why) => new Response(
   `PWX loader integrity check failed.\n\n${why}\n\nNothing was run. Installed apps and their data are untouched.\n`,
   { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "X-PWX-Integrity": "failed" } });
@@ -154,6 +225,12 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(new Response('{"local":false}', { headers: { "Content-Type": "application/json" } }));
     return;
   }
+  // Each installed app has its own home address, /app/<id>/, so it can go on the home screen
+  // as itself. Its install manifest and icons are made here, on the device, from the library.
+  const appFile = u.pathname.match(/^\/app\/([a-z0-9][a-z0-9.-]{0,99})\/(manifest\.webmanifest|icon-(180|192|512|maskable)\.png)$/);
+  if (appFile) { e.respondWith(appInstallFile(appFile[1], appFile[2], appFile[3])); return; }
+  const appPage = e.request.mode === "navigate" && u.pathname.match(/^\/app\/([a-z0-9][a-z0-9.-]{0,99})\/$/);
+  if (appPage) { currentMemo = null; e.respondWith(serveAppPage(appPage[1])); return; }
   // Pages of the loader open as themselves; any other address opens the loader.
   const path = e.request.mode === "navigate" && !(u.pathname in SHELL) ? "/" : u.pathname;
   if (!(path in SHELL)) return; // packages, the release file, test hooks: straight to the host

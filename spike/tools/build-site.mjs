@@ -57,6 +57,10 @@ DirectoryIndex index.html
   </IfModule>
 </FilesMatch>
 RewriteEngine On
+# An app's home address opens the loader page (the service worker fills in that app's details).
+RewriteRule ^app/[a-z0-9][a-z0-9.-]{0,99}/$ index.html [L]
+# The installed library opens at /library/, so its scope never covers an app's own address.
+RewriteRule ^library/$ index.html [L]
 # Only package files are served from packages/, never anything else in that folder.
 RewriteRule ^packages/(?![a-z0-9-]+\\.pwx\\.json$) - [F,L]
 # Never serve signing keys, hidden files or this file.

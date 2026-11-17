@@ -90,6 +90,7 @@ http.createServer((req, res) => {
     if (TEST) { res.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" }); return res.end(TEST_CONFIG); }
     return serveFile(res, join(ROOT, "loader"), "config.mjs");
   }
+  if (u.pathname === "/library/" || /^\/app\/[a-z0-9][a-z0-9.-]{0,99}\/$/.test(u.pathname)) return serveFile(res, join(ROOT, "loader"), "index.html", { "Content-Security-Policy": csp });
   if (u.pathname === "/" ) return serveFile(res, join(ROOT, "loader"), "index.html", { "Content-Security-Policy": csp });
   if (u.pathname.startsWith("/lib/")) return serveFile(res, join(ROOT, "lib"), u.pathname.slice(5));
   if (u.pathname === "/sw.js") {
