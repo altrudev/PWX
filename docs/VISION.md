@@ -73,6 +73,10 @@ One universal shell, the same apps everywhere:
 | A single file saved and opened | desktop computers (needs a spike per browser) |
 | `pwx-local` or a small native wrapper | desktop; Android (the ALTRU OS idea) |
 
+**Hosted is the front door, not the destination.** A link is the easiest way to reach anyone, on
+any device, so most people will meet PWX through the hosted shell. From there they keep and run
+apps the way that suits them: on the home screen, as a saved file, or in `pwx-local`.
+
 On iPhone, adding the PWX shell to the home screen is the one step that replaces the App Store.
 The shell should teach it on first visit with a short visual guide, so it becomes common
 knowledge.
@@ -80,6 +84,54 @@ knowledge.
 Push, background sync and offline work are capabilities the shell provides and the manifest
 declares, like storage. Apps don't need workers of their own (see [`QUARANTINE.md`](QUARANTINE.md),
 Part 1).
+
+## Ownership on the record
+
+Every sale, resale, gift, donation or loan is a **transfer** signed by the current owner to the new
+owner's key, and becomes part of the app's history, next to its lineage.
+
+- **Double selling** is the one real problem: an owner could sign two transfers, and offline no
+  one can tell which came first. Fix: transfers go into the **M4 transparency log**, an
+  append-only public log with outside witnesses (like the logs browsers use to catch fake HTTPS
+  certificates). The first transfer logged wins. No blockchain, tokens or fees, and it's the same
+  log PWX needs for revocation and key rotation.
+- **Privacy:** owners appear as keys, not names, and the log holds a fingerprint of each transfer,
+  not its contents. Anyone can check one ownership claim; no one can list what a person owns.
+- **Loans** are transfers that expire and return. **Licenses** (buy, earn, gift) use the same record.
+
+## Earned results
+
+Example: a test made as a PWX app, where finishing it produces a grade the student keeps.
+
+- **Rule: nobody signs their own reward.** A key on the student's device can be extracted, so the
+  student's app only signs the **answers** ("these are my answers, at this time").
+- The **issuer** (teacher or school) grades those signed answers and signs the **result**: online
+  at once, or offline when the teacher's device next syncs.
+- The result is a credential the student owns. Anyone can check it with the school's public key,
+  with no call to the school. Use the existing standard, **W3C Verifiable Credentials / Open
+  Badges**, so results work with systems schools and employers already accept.
+- Low-stakes results (practice quizzes, game badges) may be self-graded, and say so.
+- Out of scope: someone else taking the test. That's proctoring, not software.
+
+## Opening a .pwx file
+
+No browser recognises `.pwx` yet. The API that lets an installed web app own a file type exists in
+Chrome and Edge on desktop only (not Firefox, not Safari, not phones). So PWX uses several routes:
+
+| Route | Works in |
+| --- | --- |
+| Installed PWX shell registers `.pwx` (File Handling API) | Chrome and Edge on desktop |
+| `pwx-local` or ALTRU OS registers `.pwx` with the operating system | Windows, macOS, Linux, Android |
+| Links such as `…/open#<package>` open in the shell | every browser, iPhone included |
+| **A self-opening .pwx** | every desktop browser |
+
+**Self-opening file:** a `.pwx` that is also a valid HTML page. It holds the signed package and a
+tiny launcher, so any browser opens it on double-click. The launcher never trusts itself: it hands
+the package to the user's trusted PWX shell, which verifies and runs it. Without a shell it offers
+"Verify and open with PWX" and a read-only preview. On iPhone, files are opened through the shell.
+
+Long term: once PWX is widely used, propose it to browser makers as a standard, the way PDF
+ended up built into every browser.
 
 ## Hard problems, stated plainly
 
@@ -100,3 +152,8 @@ Part 1).
    kept on the author's device.
 3. **Licenses:** a signed, offline-checkable license format (buy, earn, gift, lend, expire).
 4. **Shell capabilities:** push, background sync and an install guide for iPhone.
+5. **Ownership transfers** in the M4 log: signed transfer format, first-logged-wins, privacy.
+6. **Earned credentials:** answers signed by the earner, results signed by the issuer, as W3C
+   Verifiable Credentials / Open Badges.
+7. **Self-opening .pwx:** an HTML-and-package file whose launcher hands off to the trusted shell;
+   File Handling registration in the shell and OS registration in `pwx-local` / ALTRU OS.
