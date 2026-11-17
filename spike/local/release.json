@@ -1,17 +1,23 @@
 {
   "release": {
-    "version": "0.4.4",
+    "version": "0.4.5",
     "files": {
       "lib/pwx-verify.mjs": "sha256-XXlvLVEpGLStSb2Ra2X4Q5yRZq2MQTqy9qHyTD64r0s=",
       "loader/config.mjs": "sha256-FH5HOSfUtpjJVm+UNxQxNtkwGGvd7LSqB+aHZPKjWMU=",
       "loader/fonts/dm-sans.woff2": "sha256-ynLSvOqPTap4Pb36LZtGBow844Fo4FkY+4Z6pFO0+JA=",
       "loader/fonts/syne.woff2": "sha256-aLYj8ORbkFBBsu25suT1Y6UF8T2xzQa18ZRusuH0cEg=",
-      "loader/how-it-works.html": "sha256-dVPIDQHYPmi0ew0TF7NzEwCelVrb0z+eYwlXjofRiII=",
-      "loader/index.html": "sha256-hBpZL0HXW4RT/LMxfoCLgelyyOq+fAcFPdIomdS6l3I=",
-      "loader/loader.css": "sha256-HobMazrft43pV7wjeogEEvGRTGV07FERnKl/Sd3xykw=",
-      "loader/loader.mjs": "sha256-IJDxf6a4QFwY871WtHGJs3j666+jvtBnWPibr0/YMrc=",
+      "loader/how-it-works.html": "sha256-d0MtS6YU0VCJpm2En+Qm+pjq+p6ofFX2Sj8gsvaU/+A=",
+      "loader/icons/apple-touch-icon.png": "sha256-qX+F4E/yksGTafDVuGLGyqTQEe7DTJiT7Sl1S9bAS9A=",
+      "loader/icons/icon-192.png": "sha256-75RsbT4E+vIJF1v6aqGVZIzK9i5mUY0nqDBTf4iYkvQ=",
+      "loader/icons/icon-512.png": "sha256-4rmcqRDZ012bNzDl1EVRhEOC+oMGqQoxAOc1XOPeMzE=",
+      "loader/icons/icon.svg": "sha256-3Y3a8sWdcF7fNeC9kqdLWmxaiM6IrjXksNMeJ6ruy4Y=",
+      "loader/icons/maskable-512.png": "sha256-qvVTzquIR72JNotLgxyrvIJBuCwhrC1iRdsBK/+agqw=",
+      "loader/index.html": "sha256-rxSFvkjYRA4HQxGhXix3miMuSXNEQACPr0gijdGkDFw=",
+      "loader/loader.css": "sha256-pwnkpHrWi37KG/sJTpuwhZZgnosQLM/LX4T8Jt0yx6s=",
+      "loader/loader.mjs": "sha256-CpBuUIa12RcWDDjp7PVJHMi7G8RzWxJ38VZexACcelU=",
+      "loader/manifest.webmanifest": "sha256-SBsn5iEO/qH7uGl2erlyY3dx7GImdoqK1IBfFJn6jso=",
       "loader/store.mjs": "sha256-DllHipesS1CtUbSKG86w2h7IjANw3xqsejvK4a1zMA8=",
-      "loader/sw.js": "sha256-6zC3txuaocZAQRhMOMe3FJsL+/V+lI6QpnEZRYGWvZA=",
+      "loader/sw.js": "sha256-g0LjA5T08HfmnMgMhv5kxhOuPUmVrYmxw0LEriU7NyE=",
       "app-origin/bootstrap.html": "sha256-BuBZIfowENCCnXHFskrn2aIoytmmHDhWjzFxpCQWYLo=",
       "app-origin/bootstrap.js": "sha256-qtJneMpOtY9izMDrnyEUM8GgdhK1AKN6o6lZTGWRe6U=",
       "app-origin/guard.js": "sha256-T5G742sbqECNwXC5VeaEMRdp6J5JL0nRwNQrr3474YI=",
@@ -24,6 +30,6 @@
   "sig": {
     "alg": "ed25519",
     "key": "YuCRSgEJ89t+8Xn8AOqQcxz2zk+hNMpI1R61VA1OStY=",
-    "sig": "rmKewP6ghCI4oyxkXvZhyF4q6d7QALrkv97wllMZ1o+xRjXmiFHvJxHGcBvkE08ED4wVcgjVzxmt6hkxgFTcAg=="
+    "sig": "TekZX5ffi4s5OLFgaWUs1R2BbAKMumxKfryTTqeQnU2Ebq8IhSfxE5u9GVcCmLm/9ZQsxH2EDZeNnzXgAkp2DQ=="
   }
 }

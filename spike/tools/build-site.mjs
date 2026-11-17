@@ -16,11 +16,12 @@ const host = new URL(loaderUrl).host;
 const APPS = Array.from({ length: 4 }, (_, i) => `https://app${i + 1}.${host}`);   // same rule as loader.mjs
 const L = join(out, "loader"), A = join(out, "apps");
 rmSync(out, { recursive: true, force: true });
-for (const d of [L, join(L, "lib"), join(L, "packages"), join(L, "fonts"), A, join(A, "__pwx")]) mkdirSync(d, { recursive: true });
+for (const d of [L, join(L, "lib"), join(L, "packages"), join(L, "fonts"), join(L, "icons"), A, join(A, "__pwx")]) mkdirSync(d, { recursive: true });
 const cp = (from, to) => copyFileSync(join(ROOT, from), to);
 
 // ---------- loader host ----------
-for (const f of ["index.html", "how-it-works.html", "loader.mjs", "loader.css", "store.mjs", "config.mjs", "sw.js", "fonts/syne.woff2", "fonts/dm-sans.woff2"]) cp(`loader/${f}`, join(L, f));
+for (const f of ["index.html", "how-it-works.html", "loader.mjs", "loader.css", "store.mjs", "config.mjs", "sw.js", "fonts/syne.woff2", "fonts/dm-sans.woff2", "manifest.webmanifest",
+  "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png"]) cp(`loader/${f}`, join(L, f));
 cp("lib/pwx-verify.mjs", join(L, "lib/pwx-verify.mjs"));
 cp("local/release.json", join(L, "loader-release.json"));
 for (const p of ["notes"]) cp(`packages/${p}.pwx.json`, join(L, "packages", `${p}.pwx.json`));
@@ -41,6 +42,9 @@ DirectoryIndex index.html
 </FilesMatch>
 <FilesMatch "\\.woff2$">
   ForceType font/woff2
+</FilesMatch>
+<FilesMatch "\\.webmanifest$">
+  ForceType application/manifest+json
 </FilesMatch>
 <FilesMatch "^(sw\\.js)$">
   <IfModule mod_headers.c>

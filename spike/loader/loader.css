@@ -52,6 +52,8 @@ main > section, .bar, .foot { max-width: var(--wide); margin-left: auto; margin-
 .lede { font-size: 20px; max-width: 34em; color: #34304A; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 28px 0 18px; }
 .fine { font-size: 14px; color: var(--muted); }
+.install { margin: -6px 0 18px; }
+.install .fine { margin: 0; }
 
 /* The app facts label: the one loud thing on the page, set like a food label. */
 .facts { border: 3px solid var(--ink); padding: 16px 20px 14px; background: var(--paper); box-shadow: 10px 10px 0 var(--wash); }

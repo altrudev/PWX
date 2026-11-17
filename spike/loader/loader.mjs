@@ -355,6 +355,34 @@ async function main() {
   return showLibrary();
 }
 
+// Install: offer the browser's own install prompt where it has one; elsewhere on a phone, say how.
+// Installing adds this library to the home screen; apps still open and run inside it.
+function setupInstall() {
+  const box = $("install"), btn = $("install-btn"), hint = $("install-hint");
+  if (!box || matchMedia("(display-mode: standalone)").matches || navigator.standalone === true) return;
+  let prompt = null;
+  const say = (text) => { hint.textContent = text; hint.hidden = false; box.hidden = false; };
+  addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault(); prompt = e;
+    btn.hidden = false; hint.hidden = true; box.hidden = false;
+  });
+  addEventListener("appinstalled", () => { box.hidden = true; prompt = null; });
+  btn.addEventListener("click", async () => {
+    if (!prompt) return;
+    const p = prompt; prompt = null; btn.hidden = true;
+    p.prompt();
+    const choice = await p.userChoice.catch(() => null);
+    if (choice?.outcome !== "accepted") say("Not installed. You can install later from your browser's menu.");
+  });
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) {
+    say("To install on iPhone or iPad: tap Share, then Add to Home Screen.");
+  } else if (/Android/.test(ua)) {
+    setTimeout(() => { if (!prompt && btn.hidden) say("To install: open your browser's menu and tap Install app or Add to Home screen."); }, 3000);
+  }
+}
+setupInstall();
+
 main().catch((err) => {
   state.phase = "rejected";
   state.error = err.code ?? "error";
