@@ -55,7 +55,17 @@ def main():
         # Audit N1: Remove erases the app's data, so whatever gets this origin next starts empty.
         origin = page.evaluate("() => window.__pwx.appOrigin")
         page.goto(LOADER + "/")
+        # Remove asks on the app's own origin. "Keep it" must leave everything in place.
+        box = page.frame_locator("iframe.bootstrap.confirm")
         page.get_by_role("button", name="Remove Notes", exact=True).click()
+        # Chromium drops clicks on a cross-origin frame that has only just appeared (its own
+        # clickjacking defence), so wait until the box has settled, as a person would.
+        expect(box.get_by_role("button", name="Erase this app and its data")).to_be_enabled(timeout=15000)
+        box.get_by_role("button", name="Keep it").click(timeout=15000)
+        page.wait_for_function("() => window.__pwx.phase === 'remove-cancelled'", timeout=15000)
+        check("cancelled remove keeps the app", page.get_by_role("button", name="Remove Notes", exact=True).count() == 1)
+        page.get_by_role("button", name="Remove Notes", exact=True).click()
+        box.get_by_role("button", name="Erase this app and its data").click(timeout=15000)
         # The page is already on the library before the click, so wait for the list itself to change.
         try:
             expect(page.get_by_role("button", name="Remove Notes", exact=True)).to_have_count(0, timeout=15000)

@@ -185,15 +185,49 @@ replaced loader would be) against the Notes origin: 6 pushes refused, Notes and 
 and a genuine newer version accepted; 9/9 in each engine. `tests/loader_update_test.py` now also
 checks the lockdown (15 checks).
 
-**Still open in the hosted tier:**
+3. **Erasing needs the user's own click on the app's origin** (0.4.2). A replaced loader could
+   ask an app origin to wipe itself. Now a wipe request only makes the app origin show its own
+   box ("Erase Notes and all its data from this device?"), in a frame the loader can't script or
+   click. Only the user's click there erases anything; "Keep it" cancels. The Erase button stays
+   off for a second, and in Chromium a click is ignored while the box is covered or see-through
+   (IntersectionObserver v2); Chromium also drops clicks on a cross-origin frame that has just
+   appeared. Proof: a wipe pushed by script on the loader origin, with no click, erases nothing
+   (`bootstrap_trust_test.py`, 10/10 in each engine), and the Notes test covers Keep and Erase
+   (10/10 in each engine). Limit: Firefox and WebKit can't tell whether the box is covered, so
+   there the delay and the plain wording are the only defence against a tricked click.
 
-- A replaced loader can still ask an app origin to **wipe** (data loss, not theft). Fix: the app
-  origin asks the user itself, in its own frame, before erasing.
-- In hosted mode the app origins are served by the same host, so a fully compromised host can
-  replace **their** service workers too and read app data directly. Layer 2 doesn't cover that.
-- A real quarantine needs a check outside the host: `pwx-local` (exists), a browser extension
-  that blocks `sw.js` until it matches a signed release (to be spiked), or browser-verified
-  signed bundles.
+### PWX Guard: a browser-extension spike (Chromium)
+
+**Question:** can something outside the host stop a swapped service worker, and keep the old
+verified one? **Answer: yes, in Chromium.** `spike/extension/` is a small extension that:
+
+- blocks the loader's `sw.js` by default (a `declarativeNetRequest` rule),
+- fetches `sw.js` and the signed loader release itself, checks the signature against the pinned
+  PWX release key, checks the `sw.js` hash against the release, and refuses older releases,
+- lets the browser fetch `sw.js` for 5 seconds only after that check passes.
+
+`tests/guard_ext_test.py`, 10/10 in Chromium 159:
+
+| Case | Without the extension | With the extension |
+| --- | --- | --- |
+| Host serves an unsigned `sw.js` | installed; the page can only lock down | update fetch blocked; no new worker; the old verified worker keeps serving the loader |
+| Host serves a newer signed `sw.js` | installed | verified, then let through |
+| Host goes back to an older signed release | not detected by the browser | refused by the extension |
+
+**Limits of the spike:**
+
+- **A timing gap remains.** The extension can't see the exact bytes the browser receives. A host
+  that gives the extension a good copy and the browser a bad one inside the 5-second window
+  still gets through. Firefox extensions can read and replace response bodies, which would close
+  this; that is not tested yet.
+- **Loader only.** App origins' `sw.js` isn't covered yet, because servers substitute the loader
+  origin into it, so its bytes don't match the release hash. Making that file byte-stable is the
+  next step, and it is what protects app data from a compromised host.
+- **Chromium only, loaded unpacked.** No Firefox or Safari version, no store listing, and the
+  watched origins are fixed in `config.json`.
+
+**Still open in the hosted tier:** without the extension, a fully compromised host can replace
+the app origins' own service workers and read app data directly. `pwx-local` has no such gap.
 
 ## Test results after Stage 2
 
@@ -201,11 +235,12 @@ checks the lockdown (15 checks).
 | --- | --- | --- | --- |
 | Unit tests (`verify.test.mjs`, Node) | 47/47 (0.4.1) | | |
 | Strict leak test | pass | pass | pass |
-| Notes (includes the L3 test) | 9/9 | 9/9 | 9/9 |
+| Notes (includes the L3 and erase-confirmation tests) | 10/10 | 10/10 | 10/10 |
 | Offline (saved profile, since 0.4.1) | 6/6 | 6/6 | 6/6 |
 | Local (pwx-local) | 6/6 | 6/6 | 6/6 |
 | Loader integrity, updates and lockdown (M6) | 15/15 | 15/15 | 15/15 |
-| App origin refuses a hijacked loader | 9/9 | 9/9 | 9/9 |
+| App origin refuses a hijacked loader (installs and wipe) | 10/10 | 10/10 | 10/10 |
+| PWX Guard extension spike | 10/10 | not built | not built |
 
 Leak matrix (`tests/run_matrix.sh`, Standard runtime, 36 vectors), shown as blocked / leaked. It's
 the same before and after Stage 2:
@@ -227,7 +262,7 @@ nothing either way.
 | ID | Status | Notes |
 | --- | --- | --- |
 | M4 | Open | Protections in the spec aren't built yet: transparency log with witnessed checkpoints, revocation, the key-rotation waiting period, the `sync` capability, device pairing and update policies. Until they are, the threat-table rows that depend on them don't hold. |
-| M6 residue | Browser limit, reduced | A host that serves a malicious `sw.js` still takes over the hosted loader. The running page locks down, and app origins accept only genuine packages from the app's own publisher. Still possible: a wipe request, and replacing the app origins' own workers. See "Surviving a compromised host". |
+| M6 residue | Browser limit, reduced | A host that serves a malicious `sw.js` still takes over the hosted loader. The running page locks down, app origins accept only genuine packages from the app's own publisher, and erasing needs the user's click on the app's origin. Still possible without the extension: replacing the app origins' own workers. The PWX Guard spike blocks a swapped loader worker in Chromium. See "Surviving a compromised host". |
 | WebKit offline | Resolved: test setup | The `sw.js` requests came from Playwright's temporary WebKit profile, whose HTTP cache doesn't keep scripts between visits, so it ignored `updateViaCache: "all"`. With a saved profile, like real Safari uses, WebKit answers the check from its cache and sends nothing (offline test 6/6 in all engines). A probe showed the same for a plain page outside PWX. |
 | Daily update check | Accepted | In every browser, the service worker spec makes the update check skip the cache once it's more than 24 hours old. So the host can see one `sw.js` request a day per origin, telling it that PWX was opened that day, not which app or what it did. It's how loader security updates arrive, and those are signed. Users who don't want even that should use the Verified tier (`pwx-local`). |
 | WebKit leaks | Browser limit | WebRTC and link preconnect leak in WebKit, and it has no switch to stop them. Strict apps aren't affected: they have no DOM and no `RTCPeerConnection`. |

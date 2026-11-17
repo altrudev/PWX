@@ -256,8 +256,9 @@ async function launch(id) {
 }
 
 // The bootstrap only listens to its parent, and only on a channel the parent hands it.
-async function bootstrapCall(APP, msg, ok, failed, { keep = true } = {}) {
-  const boot = Object.assign(document.createElement("iframe"), { className: "bootstrap", src: `${APP}/__pwx/bootstrap.html` });
+async function bootstrapCall(APP, msg, ok, failed, { keep = true, visible = false } = {}) {
+  const boot = Object.assign(document.createElement("iframe"), { className: visible ? "bootstrap confirm" : "bootstrap", src: `${APP}/__pwx/bootstrap.html` });
+  if (visible) boot.title = "Confirmation from the app's own origin";
   const booted = waitFor("bootstrap-ready", APP);
   $("stage").append(boot);
   await booted;
@@ -277,9 +278,11 @@ async function bootstrapCall(APP, msg, ok, failed, { keep = true } = {}) {
 // installed, so its origin is never handed to another app with data still in it.
 async function removeApp(r) {
   if (state.locked) throw new PwxError("loader", "this loader is locked");
-  status(`Removing ${r.name} and its data…`);
   const APP = await appOrigin(r.id, r);
-  await bootstrapCall(APP, { type: "wipe" }, "wiped", "wipe-failed", { keep: false });
+  // The app's own origin asks the user; this page can't answer for them.
+  status(`To remove ${r.name}, confirm in the box below. It comes from the app's own origin, so only you can approve erasing its data.`);
+  state.phase = "remove-confirm";
+  await bootstrapCall(APP, { type: "wipe" }, "wiped", "wipe-failed", { keep: false, visible: true });
   await library.remove(r.id);
   state.removed = (state.removed ?? []).concat(r.id);
 }
@@ -297,7 +300,10 @@ async function showLibrary() {
     del.setAttribute("aria-label", `Remove ${r.name}`);
     del.addEventListener("click", async () => {
       try { await removeApp(r); await showLibrary(); }
-      catch (err) { status(`Couldn't remove ${r.name}: ${err.message}. It's still installed.`, "error"); state.phase = "remove-failed"; }
+      catch (err) {
+        if (/cancelled$/.test(err.message)) { status(`Kept ${r.name}. Nothing was erased.`); state.phase = "remove-cancelled"; }
+        else { status(`Couldn't remove ${r.name}: ${err.message}. It's still installed.`, "error"); state.phase = "remove-failed"; }
+      }
     });
     li.append(name, meta, " ", open, " ", del);
     return li;

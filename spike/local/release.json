@@ -1,26 +1,26 @@
 {
   "release": {
-    "version": "0.4.1",
+    "version": "0.4.2",
     "files": {
       "lib/pwx-verify.mjs": "sha256-XXlvLVEpGLStSb2Ra2X4Q5yRZq2MQTqy9qHyTD64r0s=",
       "loader/config.mjs": "sha256-FH5HOSfUtpjJVm+UNxQxNtkwGGvd7LSqB+aHZPKjWMU=",
       "loader/index.html": "sha256-T/+tRso5FONIcj1KkAMImidy1IzUGV1sYl7/0oqhn2o=",
-      "loader/loader.css": "sha256-DszeTH/OQTjKIiSlD07zeQt7QaRmntKl1/y0mwQUQ18=",
-      "loader/loader.mjs": "sha256-QaWRZ/E3dIGOYdXpvjQmmFjrZWMDlVkGxxWn/mTUeug=",
+      "loader/loader.css": "sha256-0rygQBlP8MRka/xw/hZzmYJsnsQSSDwmcM97P2W8zlE=",
+      "loader/loader.mjs": "sha256-dNrCij97Z/VGuJZZG7uDPVxJuoY2VC6QO9AqOVAj77w=",
       "loader/store.mjs": "sha256-DllHipesS1CtUbSKG86w2h7IjANw3xqsejvK4a1zMA8=",
       "loader/sw.js": "sha256-z/1xkYgBu34CiaZnBh+TGp9rauiGpgbrr0U3SsxyZOU=",
-      "app-origin/bootstrap.html": "sha256-9JrT65ViQ0oqbSFmzplt36pXf3XbXBoIDwKedw2D+v0=",
-      "app-origin/bootstrap.js": "sha256-MsbrUlUZ5WbbXvmH+ifCnicjU+smH5W2FeL1Uwa8XcA=",
+      "app-origin/bootstrap.html": "sha256-BuBZIfowENCCnXHFskrn2aIoytmmHDhWjzFxpCQWYLo=",
+      "app-origin/bootstrap.js": "sha256-qtJneMpOtY9izMDrnyEUM8GgdhK1AKN6o6lZTGWRe6U=",
       "app-origin/guard.js": "sha256-T5G742sbqECNwXC5VeaEMRdp6J5JL0nRwNQrr3474YI=",
       "app-origin/renderer.js": "sha256-0iISv0YjRJQbTOsckJNZP2VIK19Uc7L8PlevSLekkTQ=",
       "app-origin/strict.html": "sha256-uGg0JedU1IFHz3RYE0kPVzdLwjEZw5vw1MkDMV1UVYE=",
-      "app-origin/sw.js": "sha256-R3r7KTA88CgayK+Z3kEARGmC0mPei+0OBulJa0rW66A=",
-      "app-origin/ui.css": "sha256-pwAlPyW8ZnERztqY6NLPsZMz89x6BBjG34LjRZ61jPw="
+      "app-origin/sw.js": "sha256-G2Zy4tl/EgEI2/sm8s3OgSzJBOUk6A/tvZBn3uUVNao=",
+      "app-origin/ui.css": "sha256-/9wxoh3Rbz/hn6vsIbMo2pNSo3ZiEoSsmJorsqxlWRw="
     }
   },
   "sig": {
     "alg": "ed25519",
     "key": "YuCRSgEJ89t+8Xn8AOqQcxz2zk+hNMpI1R61VA1OStY=",
-    "sig": "0dTXQvEeTticBhrzNeaFzvrOH6VKaWUlkDdNFT+rYAqprP/ADSZ8mnsOXK18BoIAFNZm6RhKYHoCNvz06TlWBw=="
+    "sig": "XfcDCyKugTr2eSbgwzhEcsEeTELqAhopMcW5RzfgCR1L5X4jYmFhkrxxUCHC3ES3ROlHkf03Y0ir3zJAmFyQAA=="
   }
 }

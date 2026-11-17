@@ -74,7 +74,7 @@
     // grants: what the runtime may hand the app, read from the manifest verified just above.
     // The renderer reads them here, so neither the loader nor the app can widen them.
     const grants = { storage: manifest.capabilities?.storage?.local === true };
-    await pinStore("readwrite", (s) => s.put({ id: manifest.id, publisher: manifest.publisher, version: manifest.version, manifestHash, grants }, "app"));
+    await pinStore("readwrite", (s) => s.put({ id: manifest.id, publisher: manifest.publisher, version: manifest.version, manifestHash, grants, name: String(manifest.name ?? manifest.id).slice(0, 80) }, "app"));
   }
 
   // Remove: erase everything the app left on this origin, so the origin can be reused safely.
@@ -96,6 +96,44 @@
     try { localStorage.clear(); sessionStorage.clear(); } catch {}
   }
 
+  // Erasing needs the user's own click, here, on this origin. The loader can ask, but it can't
+  // answer: it can't script this frame or click in it. So a loader that has been replaced can't
+  // erase an app's data on its own. The button stays off for a moment, and where the browser
+  // can tell (Chromium), a click is ignored while this box is covered or see-through.
+  let asking = null;
+  function confirmWipe() {
+    return (asking ??= (async () => {
+      const pin = await pinStore("readonly", (s) => s.get("app")).catch(() => null);
+      const what = pin ? `${pin.name ?? pin.id} (${pin.id})` : "the app on this origin";
+      const make = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls, textContent: text });
+      const box = make("div", "pwx-confirm", "");
+      const note = make("p", "muted", "This can't be undone. Only you can approve it, here.");
+      const erase = make("button", "btn btn-danger", "Erase this app and its data");
+      const keep = make("button", "btn", "Keep it");
+      erase.type = keep.type = "button"; erase.disabled = true;
+      box.append(make("p", "pwx-confirm-title", `Erase ${what} and all its data from this device?`), note, erase, " ", keep);
+      document.body.append(box);
+      let seen = true; // browsers that can't report visibility: rely on the delay and the click
+      if ("IntersectionObserver" in window) {
+        new IntersectionObserver((entries) => {
+          const e = entries[entries.length - 1];
+          seen = e.isVisible === undefined ? e.isIntersecting : e.isVisible;
+        }, { threshold: 1, trackVisibility: true, delay: 100 }).observe(box);
+      }
+      setTimeout(() => { erase.disabled = false; }, 1000);
+      try {
+        await new Promise((resolve, reject) => {
+          erase.addEventListener("click", (e) => {
+            if (!e.isTrusted) return;
+            if (!seen) { note.textContent = "This box is covered or hidden, so the click was ignored."; return; }
+            resolve();
+          });
+          keep.addEventListener("click", (e) => { if (e.isTrusted) reject(new Error("cancelled")); });
+        });
+      } finally { box.remove(); asking = null; }
+    })());
+  }
+
   addEventListener("message", (e) => {
     if (connected || e.source !== window.parent || e.data?.type !== "connect" || !e.ports[0]) return;
     connected = true;
@@ -106,7 +144,7 @@
         catch (err) { port.postMessage({ type: "install-failed", error: String(err?.message ?? err) }); }
       }
       if (m.data?.type === "wipe") {
-        try { await wipe(); port.postMessage({ type: "wiped" }); }
+        try { await confirmWipe(); await wipe(); port.postMessage({ type: "wiped" }); }
         catch (err) { port.postMessage({ type: "wipe-failed", error: String(err?.message ?? err) }); }
       }
     };

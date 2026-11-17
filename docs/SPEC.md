@@ -132,9 +132,11 @@ Each app runs on its own origin, so apps can't read each other's data.
 | Hosted | spike: `http://127.0.0.1:8110`–`8129`, standing in for per-app subdomains | the loader: FNV-1a(id) mod 20, linear probing; kept in the library record and across updates |
 | Local (pwx-local) | `http://127.0.0.1:<port>`, one port per app (up to 256) | pwx-local, through `POST /__pwx/origin` (same-origin only) |
 
-**Remove** wipes the app's origin (every IndexedDB database, every cache, `localStorage`) through
-the bootstrap channel, then deletes the library record. If the wipe fails the app stays installed,
-so an origin is never reused with data in it.
+**Remove** asks on the app's own origin: the loader shows the origin's bootstrap frame, and the
+bootstrap asks "Erase <app> and all its data from this device?". Only the user's click there
+erases anything (every IndexedDB database, every cache, `localStorage`); the loader can't answer
+for them. Then the loader deletes the library record. If the user keeps the app or the wipe
+fails, the app stays installed, so an origin is never reused with data in it.
 
 ## 6. Runtimes
 
@@ -218,7 +220,8 @@ and per-app origins from the user's own machine.
 | A changed or partial hosted loader (cache or host) | signed release, every file checked on every serve | blocked (AUDIT M6) |
 | A rolled-back or swapped loader update | version must increase; same-version swap refused; updates only on click | blocked (AUDIT M6) |
 | A compromised host replaces the loader's `sw.js` | the running page locks down; app origins verify packages themselves and pin id, publisher and version | **reduced, not closed**: the replaced loader can't install forged or older app code, but can request a wipe; use pwx-local |
-| A compromised host replaces an app origin's `sw.js` | none in the hosted tier | **open (browser limit)**: needs a check outside the host (pwx-local, an extension, or signed bundles) |
+| A replaced loader asks an app origin to erase its data | the app origin asks the user itself, in a frame the loader can't click | blocked without the user's click (AUDIT) |
+| A compromised host replaces an app origin's `sw.js` | none in the hosted tier; PWX Guard extension spike covers the loader's worker only | **open (browser limit)**: needs a check outside the host (pwx-local, an extension, or signed bundles) |
 
 ## 9. Not implemented yet
 
