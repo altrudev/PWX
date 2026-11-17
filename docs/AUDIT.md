@@ -199,10 +199,10 @@ checks the lockdown (15 checks).
 
 | Suite | Chromium | Firefox | WebKit |
 | --- | --- | --- | --- |
-| Unit tests (`verify.test.mjs`, Node) | 46/46 | | |
+| Unit tests (`verify.test.mjs`, Node) | 47/47 (0.4.1) | | |
 | Strict leak test | pass | pass | pass |
 | Notes (includes the L3 test) | 9/9 | 9/9 | 9/9 |
-| Offline | 6/6 | 6/6 | 5/6 (known, see Open) |
+| Offline (saved profile, since 0.4.1) | 6/6 | 6/6 | 6/6 |
 | Local (pwx-local) | 6/6 | 6/6 | 6/6 |
 | Loader integrity, updates and lockdown (M6) | 15/15 | 15/15 | 15/15 |
 | App origin refuses a hijacked loader | 9/9 | 9/9 | 9/9 |
@@ -228,7 +228,8 @@ nothing either way.
 | --- | --- | --- |
 | M4 | Open | Protections in the spec aren't built yet: transparency log with witnessed checkpoints, revocation, the key-rotation waiting period, the `sync` capability, device pairing and update policies. Until they are, the threat-table rows that depend on them don't hold. |
 | M6 residue | Browser limit, reduced | A host that serves a malicious `sw.js` still takes over the hosted loader. The running page locks down, and app origins accept only genuine packages from the app's own publisher. Still possible: a wipe request, and replacing the app origins' own workers. See "Surviving a compromised host". |
-| WebKit offline | Open | In hosted mode, opening an installed app still requests `sw.js` for the app and the loader. Only WebKit does this (offline test 5/6). |
+| WebKit offline | Resolved: test setup | The `sw.js` requests came from Playwright's temporary WebKit profile, whose HTTP cache doesn't keep scripts between visits, so it ignored `updateViaCache: "all"`. With a saved profile, like real Safari uses, WebKit answers the check from its cache and sends nothing (offline test 6/6 in all engines). A probe showed the same for a plain page outside PWX. |
+| Daily update check | Accepted | In every browser, the service worker spec makes the update check skip the cache once it's more than 24 hours old. So the host can see one `sw.js` request a day per origin, telling it that PWX was opened that day, not which app or what it did. It's how loader security updates arrive, and those are signed. Users who don't want even that should use the Verified tier (`pwx-local`). |
 | WebKit leaks | Browser limit | WebRTC and link preconnect leak in WebKit, and it has no switch to stop them. Strict apps aren't affected: they have no DOM and no `RTCPeerConnection`. |
 | Notes migration | Accepted for the spike | Notes saved in the old `pwx-notes` database aren't moved to `pwx-app-store`. |
 
