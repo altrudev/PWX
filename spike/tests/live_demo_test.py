@@ -15,7 +15,10 @@ with sync_playwright() as p:
     b = getattr(p, a.browser).launch(); version = b.version
     page = b.new_context(viewport={"width": 900, "height": 700}).new_page()
     page.goto(a.url + "/")
-    check("front page explains PWX", page.get_by_role("heading", name="PWX demo").is_visible())
+    check("front page explains PWX", page.get_by_role("heading", name="Apps that can only do what they say.").is_visible() and page.get_by_role("heading", name="Why PWX exists").is_visible())
+    page.goto(a.url + "/how-it-works.html")
+    check("how-it-works page opens with its diagrams", page.get_by_role("heading", name="How PWX works").is_visible() and page.locator("figure.diagram svg").count() == 3)
+    page.goto(a.url + "/")
     page.get_by_role("link", name="Try the Notes app").click()
     page.wait_for_function("() => window.__pwx && ['consent', 'running', 'rejected'].includes(window.__pwx.phase)", timeout=30000)
     st = page.evaluate("() => window.__pwx")

@@ -106,6 +106,7 @@ function lockdown() {
   if (state.locked) return;
   state.locked = true;
   for (const id of ["library", "consent", "loader-update"]) $(id).hidden = true;
+  showIntro(false);
   for (const f of document.querySelectorAll("iframe.bootstrap")) f.remove();
   for (const el of document.querySelectorAll("button, input, a.btn")) { el.disabled = true; el.removeAttribute("href"); }
   const lines = [
@@ -172,7 +173,10 @@ function describe(m, fp) {
     ...["camera", "microphone", "location", "notifications"].filter((k) => c[k]).map((k) => `Can use ${k}`),
   ];
 }
+const INTRO = ["intro", "how", "why"];
+const showIntro = (on) => { for (const id of INTRO) { const el = $(id); if (el) el.hidden = !on; } };
 function showLines(lines) {
+  showIntro(false);
   $("consent").hidden = false;
   $("consent").replaceChildren(...lines.map((line) => Object.assign(document.createElement("div"), { textContent: line })));
 }
@@ -267,6 +271,8 @@ async function bootstrapCall(APP, msg, ok, failed, { keep = true, visible = fals
   const booted = waitFor("bootstrap-ready", APP);
   $("stage").append(boot);
   await booted;
+  // A confirmation box sits below the library; bring it into view so the person sees it.
+  if (visible) boot.scrollIntoView({ block: "center" });
   const channel = new MessageChannel();
   const done = new Promise((resolve, reject) => {
     channel.port1.onmessage = (m) => {
@@ -315,6 +321,7 @@ async function showLibrary() {
   }));
   $("empty").hidden = apps.length > 0;
   $("library").hidden = false;
+  showIntro(true);
   status(apps.length ? "Your apps. They open without any network connection." : "No apps installed yet.");
   state.phase = "library";
   state.apps = apps.map((r) => r.id);

@@ -20,7 +20,7 @@ const HOME = process.env.PWX_HOME ?? join(homedir(), ".pwx");
 const PORT = Number(process.env.PWX_PORT ?? 7100);
 const HOSTNAME = "127.0.0.1";
 const LOADER = `http://${HOSTNAME}:${PORT}`;
-const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript",
+const TYPES = { ".woff2": "font/woff2", ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript",
   ".css": "text/css", ".json": "application/json" };
 
 const { canonicalize, sha256, strictParse, b64 } = await import(join(BUNDLE, "lib/pwx-verify.mjs"));
@@ -97,7 +97,8 @@ async function serve() {
   const appOrigins = () => Object.values(ports).map((p) => `http://${HOSTNAME}:${p}`).join(" ") || "'none'";
 
   const LOADER_FILES = { "/": "loader/index.html", "/loader.mjs": "loader/loader.mjs", "/loader.css": "loader/loader.css",
-    "/store.mjs": "loader/store.mjs", "/config.mjs": "loader/config.mjs", "/lib/pwx-verify.mjs": "lib/pwx-verify.mjs" };
+    "/store.mjs": "loader/store.mjs", "/config.mjs": "loader/config.mjs", "/lib/pwx-verify.mjs": "lib/pwx-verify.mjs",
+    "/how-it-works.html": "loader/how-it-works.html", "/fonts/syne.woff2": "loader/fonts/syne.woff2", "/fonts/dm-sans.woff2": "loader/fonts/dm-sans.woff2" };
   http.createServer((req, res) => {
     if (!hostOk(req, PORT)) return send(res, 421, "wrong host");
     const u = new URL(req.url, LOADER);

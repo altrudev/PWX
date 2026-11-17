@@ -1,32 +1,132 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>PWX loader (spike, Host-verified tier)</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PWX: apps that can only do what they say</title>
+<meta name="description" content="PWX apps are signed packages that run in any browser, offline, and can only do what they declare. Try the live demo.">
 <link rel="stylesheet" href="/loader.css"></head>
 <body>
-<header><strong>PWX loader</strong> <span class="tier">Host-verified tier: this loader comes from its web host and can be swapped by it.</span></header>
-<section id="about">
-  <h1>PWX demo</h1>
-  <p>PWX apps are signed packages that can only do what they say they do. This page is the PWX loader:
-  it checks every app before it runs, keeps your apps on this device, and works offline.</p>
-  <p><a class="btn" href="/?pkg=notes">Try the Notes app</a> <a href="https://github.com/altrudev/PWX">How it works, on GitHub</a></p>
-  <p class="meta">Early demo: please don't keep important data here. Each app gets its own private storage
-  area at app1&ndash;app4.pwx.altru.dev; those addresses aren't meant to be opened directly.</p>
+<header class="bar">
+  <a class="mark" href="/">PWX</a>
+  <nav><a href="/how-it-works.html">How it works</a><a href="https://github.com/altrudev/PWX">GitHub</a></nav>
+</header>
+
+<main>
+<section id="intro" class="hero">
+  <div class="hero-copy">
+    <h1>Apps that can only do what they say.</h1>
+    <p class="lede">A PWX app is a signed package. Before it runs, this page checks who made it, that
+    nothing in it was changed, and what it's allowed to do. Then it runs sealed off from everything
+    else, on your device, even offline.</p>
+    <p class="actions"><a class="btn primary" href="/?pkg=notes">Try the Notes app</a>
+      <a class="btn quiet" href="/how-it-works.html">See how it works</a></p>
+    <p class="fine">Early demo by <a href="https://altru.dev">ALTRU.dev</a>. Please don't keep important data here yet.</p>
+  </div>
+
+  <aside class="facts" aria-label="App facts for Notes">
+    <h2>App facts</h2>
+    <p class="facts-name">Notes <span>1.0.0</span></p>
+    <p class="facts-row"><span>Made by</span><strong>hYbj WbyB 96x2 MJYc</strong></p>
+    <p class="facts-row"><span>Signature</span><strong class="ok">Checked</strong></p>
+    <p class="facts-row"><span>Files</span><strong class="ok">Unchanged</strong></p>
+    <h3>Can</h3>
+    <ul class="can">
+      <li>Keep your notes on this device</li>
+    </ul>
+    <h3>Can't</h3>
+    <ul class="cant">
+      <li>Send anything to any server</li>
+      <li>Use the camera, microphone or location</li>
+      <li>Read other apps' data</li>
+      <li>Rewrite its own code</li>
+    </ul>
+    <p class="facts-foot">Read from the app's signed manifest. The browser enforces it; the app can't
+    change it.</p>
+  </aside>
 </section>
+
+<section id="how" class="steps" aria-labelledby="steps-title">
+  <h2 id="steps-title">What happens when you open an app</h2>
+  <ol>
+    <li>
+      <svg viewBox="0 0 120 90" aria-hidden="true" class="pic">
+        <rect x="20" y="10" width="62" height="74" rx="6" class="paper"/>
+        <line x1="32" y1="28" x2="70" y2="28" class="ink-line"/><line x1="32" y1="40" x2="70" y2="40" class="ink-line"/>
+        <line x1="32" y1="52" x2="58" y2="52" class="ink-line"/>
+        <circle cx="80" cy="66" r="17" class="seal"/>
+        <path d="M72 66l6 6 11-12" class="tick-on-seal"/>
+      </svg>
+      <h3>The maker signs it</h3>
+      <p>Every file is fingerprinted and the list is signed with the maker's key, along with what the app may do.</p>
+    </li>
+    <li>
+      <svg viewBox="0 0 120 90" aria-hidden="true" class="pic">
+        <rect x="14" y="14" width="92" height="62" rx="8" class="screen"/>
+        <circle cx="48" cy="45" r="16" class="lens"/>
+        <line x1="60" y1="57" x2="72" y2="69" class="lens-handle"/>
+        <path d="M80 34l5 5 9-10" class="tick"/><path d="M80 52l5 5 9-10" class="tick"/>
+      </svg>
+      <h3>Your device checks it</h3>
+      <p>The signature, every file and the version are checked here, every time it opens. Anything changed is refused.</p>
+    </li>
+    <li>
+      <svg viewBox="0 0 120 90" aria-hidden="true" class="pic">
+        <rect x="10" y="12" width="100" height="66" rx="10" class="box"/>
+        <rect x="30" y="28" width="40" height="34" rx="6" class="app"/>
+        <line x1="70" y1="45" x2="98" y2="45" class="blocked"/>
+        <line x1="88" y1="38" x2="102" y2="52" class="cross"/><line x1="102" y1="38" x2="88" y2="52" class="cross"/>
+      </svg>
+      <h3>It runs sealed</h3>
+      <p>It gets only what it declared, its own private storage, and no way out to anything else.</p>
+    </li>
+  </ol>
+</section>
+
+<section id="why" class="why" aria-labelledby="why-title">
+  <h2 id="why-title">Why PWX exists</h2>
+  <div class="why-grid">
+    <div class="why-main">
+      <p class="big">Today, using an app means trusting whoever made it, and whoever sells it to you.</p>
+      <p>A privacy policy says where your data goes, but nothing stops an app from sending it somewhere
+      else, changing after you install it, or disappearing with your data. App stores decide what you may
+      run and take a cut of everything sold.</p>
+      <p>PWX moves that trust to something you can check yourself. The goal: <strong>apps anyone can make,
+      share, update and branch, that run on everything, and where you always know who made them and what
+      they can do.</strong></p>
+    </div>
+    <ul class="pillars">
+      <li><h3>Private by design</h3><p>Apps declare what they may do, and the browser enforces it. Your data stays on your device.</p></li>
+      <li><h3>Yours to keep</h3><p>An app is a signed file you own. It works offline, with no account and no store.</p></li>
+      <li><h3>Runs on everything</h3><p>One app for phones, tablets and computers, in any modern browser.</p></li>
+      <li><h3>Open to everyone</h3><p>Build it however you like, by hand or with AI. Anyone can branch it, and you can always see where it came from.</p></li>
+    </ul>
+  </div>
+  <p class="more"><a href="/how-it-works.html#vision">Where PWX is going</a></p>
+</section>
+
 <section id="lock" role="alert" hidden></section>
-<section id="status">Starting…</section>
-<section id="library" hidden>
+<section id="status" aria-live="polite">Starting…</section>
+<section id="library" class="panel" hidden>
   <h2>Your apps</h2>
   <ul id="apps"></ul>
-  <p id="empty" hidden>Nothing installed yet.</p>
+  <p id="empty" hidden>Nothing installed yet. Start with <a href="/?pkg=notes">Notes</a>.</p>
   <label class="btn" for="file">Install from a .pwx file</label>
   <input id="file" type="file" accept=".json,.pwx,application/json">
 </section>
-<section id="consent" hidden></section>
+<section id="consent" class="panel" hidden></section>
+<div id="stage"></div>
 <section id="loader-update" hidden>
   <span id="loader-version"></span>
-  <button class="btn" id="update-check" type="button">Check for loader update</button>
-  <button class="btn" id="update-apply" type="button" hidden>Update loader</button>
+  <button class="btn small" id="update-check" type="button">Check for loader update</button>
+  <button class="btn small" id="update-apply" type="button" hidden>Update loader</button>
   <p id="update-msg"></p>
 </section>
-<div id="stage"></div>
+</main>
+
+<footer class="foot">
+  <p><strong>PWX</strong> is an open project (Apache-2.0) by <a href="https://altru.dev">ALTRU.dev</a>.
+  <a href="https://github.com/altrudev/PWX">Code and security audit on GitHub</a>.
+  <a href="https://github.com/altrudev/PWX/security/advisories/new">Report a security problem privately</a>.</p>
+  <p class="fine">This page is the hosted demo: it comes from its web host. The app files it runs are
+  checked against their signatures on your device.</p>
+</footer>
 <script type="module" src="/loader.mjs"></script>
 </body></html>

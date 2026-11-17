@@ -21,7 +21,7 @@ const APP_ORIGINS = APP_PORTS.map((p) => `http://127.0.0.1:${p}`).join(" ");
 // PWX_TEST=1: serve the test config (test switches on) and the unsafe positive-control page.
 // Without it, this server behaves like a production host.
 const TEST = process.env.PWX_TEST === "1";
-const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json", ".css": "text/css" };
+const TYPES = { ".woff2": "font/woff2", ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json", ".css": "text/css" };
 
 const hits = []; let tcp = 0;
 const served = []; // requests that reached the loader or app host (not test hooks)
