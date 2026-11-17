@@ -1,14 +1,14 @@
 {
   "release": {
-    "version": "0.4.2",
+    "version": "0.4.3",
     "files": {
       "lib/pwx-verify.mjs": "sha256-XXlvLVEpGLStSb2Ra2X4Q5yRZq2MQTqy9qHyTD64r0s=",
       "loader/config.mjs": "sha256-FH5HOSfUtpjJVm+UNxQxNtkwGGvd7LSqB+aHZPKjWMU=",
-      "loader/index.html": "sha256-T/+tRso5FONIcj1KkAMImidy1IzUGV1sYl7/0oqhn2o=",
+      "loader/index.html": "sha256-02yUQBa4sgp8h0Po4gC+WFxhlyIyf7s98ny0bC6TvOI=",
       "loader/loader.css": "sha256-0rygQBlP8MRka/xw/hZzmYJsnsQSSDwmcM97P2W8zlE=",
-      "loader/loader.mjs": "sha256-dNrCij97Z/VGuJZZG7uDPVxJuoY2VC6QO9AqOVAj77w=",
+      "loader/loader.mjs": "sha256-DiDgaTXgf4JSmeVBfLxtvRvHK5ntayiuSspt1kE4HDM=",
       "loader/store.mjs": "sha256-DllHipesS1CtUbSKG86w2h7IjANw3xqsejvK4a1zMA8=",
-      "loader/sw.js": "sha256-z/1xkYgBu34CiaZnBh+TGp9rauiGpgbrr0U3SsxyZOU=",
+      "loader/sw.js": "sha256-nlhi599XLOYHr5MLKNPqcBO1mlukCyd3tOtwTfwV4Co=",
       "app-origin/bootstrap.html": "sha256-BuBZIfowENCCnXHFskrn2aIoytmmHDhWjzFxpCQWYLo=",
       "app-origin/bootstrap.js": "sha256-qtJneMpOtY9izMDrnyEUM8GgdhK1AKN6o6lZTGWRe6U=",
       "app-origin/guard.js": "sha256-T5G742sbqECNwXC5VeaEMRdp6J5JL0nRwNQrr3474YI=",
@@ -21,6 +21,6 @@
   "sig": {
     "alg": "ed25519",
     "key": "YuCRSgEJ89t+8Xn8AOqQcxz2zk+hNMpI1R61VA1OStY=",
-    "sig": "XfcDCyKugTr2eSbgwzhEcsEeTELqAhopMcW5RzfgCR1L5X4jYmFhkrxxUCHC3ES3ROlHkf03Y0ir3zJAmFyQAA=="
+    "sig": "cPM3esbCn/Bu1dZ+JthQiZlXHwSy4RSpS+CEJEHR1byKxYKBdhcHJ4tLHrsKexXVlp3JKCf+fXeMdd7olafTAw=="
   }
 }

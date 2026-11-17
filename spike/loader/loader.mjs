@@ -5,7 +5,12 @@ import { TEST } from "/config.mjs";
 const LOADER = location.origin;
 // Hosted spike: each app gets its own origin from a fixed pool (ports stand in for per-app
 // subdomains). The assignment is kept with the installed app, so it never changes.
-const HOSTED_POOL = Array.from({ length: 20 }, (_, i) => `http://127.0.0.1:${8110 + i}`);
+// App origins follow from the loader's own address, so the same signed files work on any host:
+//   test host  http://127.0.0.1:8100 -> http://127.0.0.1:8110 ... :8129 (20 origins)
+//   real host  https://pwx.example   -> https://app1.pwx.example ... app4 (one subdomain each)
+const HOSTED_POOL = location.hostname === "127.0.0.1"
+  ? Array.from({ length: 20 }, (_, i) => `http://127.0.0.1:${8110 + i}`)
+  : Array.from({ length: 4 }, (_, i) => `${location.protocol}//app${i + 1}.${location.host}`);
 const $ = (id) => document.getElementById(id);
 const state = (window.__pwx = { phase: "start", messages: [] });
 const status = (t, cls = "") => { $("status").textContent = t; $("status").className = cls; };

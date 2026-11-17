@@ -14,7 +14,12 @@ const RELEASE_KEY = "YuCRSgEJ89t+8Xn8AOqQcxz2zk+hNMpI1R61VA1OStY=";
 const META = "pwx-loader-meta", RELEASE_URL = "/__pwx/loader-release";
 const SHELL = { "/": "loader/index.html", "/loader.mjs": "loader/loader.mjs", "/loader.css": "loader/loader.css",
   "/store.mjs": "loader/store.mjs", "/config.mjs": "loader/config.mjs", "/lib/pwx-verify.mjs": "lib/pwx-verify.mjs" };
-const APPS = Array.from({ length: 20 }, (_, i) => `http://127.0.0.1:${8110 + i}`).join(" ");
+// App origins follow from the loader's own address, so the same signed files work on any host:
+//   test host  http://127.0.0.1:8100 -> http://127.0.0.1:8110 ... :8129 (20 origins)
+//   real host  https://pwx.example   -> https://app1.pwx.example ... app4 (one subdomain each)
+const APPS = (self.location.hostname === "127.0.0.1"
+  ? Array.from({ length: 20 }, (_, i) => `http://127.0.0.1:${8110 + i}`)
+  : Array.from({ length: 4 }, (_, i) => `${self.location.protocol}//app${i + 1}.${self.location.host}`)).join(" ");
 const CSP = `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src ${APPS}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
 const TYPES = { html: "text/html; charset=utf-8", mjs: "text/javascript", css: "text/css" };
 const headersFor = (file) => ({ "Content-Type": TYPES[file.split(".").pop()], ...(file.endsWith(".html") ? { "Content-Security-Policy": CSP } : {}) });

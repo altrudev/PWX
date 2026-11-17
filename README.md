@@ -25,6 +25,9 @@ The goals are privacy, no data loss, and users who own their data.
 **Where it's going:** apps anyone can make, share, update and branch, that run on everything,
 and where you always know who made them and what they can do. See [`docs/VISION.md`](docs/VISION.md).
 
+**Live demo:** [pwx.altru.dev](https://pwx.altru.dev): install the Notes app and see what it's
+allowed to do. An early demo; please don't keep important data there.
+
 ## Status
 
 Early design, with a working, security-audited spike (spike release 0.4.1). On this branch (`spike`):
