@@ -34,3 +34,6 @@ body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-ser
 .btn-danger { color: var(--danger); }
 .empty { margin: auto; color: var(--muted); text-align: center; }
 .hidden { display: none; }
+.pwx-confirm { padding: 12px 16px; }
+.pwx-confirm p { margin: 0 0 8px; }
+.pwx-confirm-title { font-weight: 600; }

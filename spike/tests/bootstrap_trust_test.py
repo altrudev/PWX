@@ -64,6 +64,10 @@ def main():
                 r = push(msg)
                 check(f"refused: {name}", r.get("type") == "install-failed" and expected in r.get("error", ""), str(r)[:90])
 
+            # A hijacked loader asks for a wipe. Without the user's click on the app's origin, nothing happens.
+            r = push({"type": "wipe"})
+            check("wipe request without the user's click erases nothing", r.get("type") == "timeout", str(r)[:90])
+
             page.goto(f"{LOADER}/?open=org.example.notes")
             try:
                 expect(app.get_by_role("button", name="Keep me")).to_be_visible(timeout=20000); intact = True

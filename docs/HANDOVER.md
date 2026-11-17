@@ -1,6 +1,6 @@
 # PWX handover
 
-For the next person (or chat) picking up PWX. Last updated 2026-11-16, at spike release **0.4.1**.
+For the next person (or chat) picking up PWX. Last updated 2026-11-16, at spike release **0.4.2**.
 Read [`../README.md`](../README.md) for what PWX is, [`SPEC.md`](SPEC.md) for how it works and
 [`AUDIT.md`](AUDIT.md) for the security record. This file covers where things are, how to work on
 them, and what's next.
@@ -9,7 +9,7 @@ them, and what's next.
 
 - **Stage:** early design, with a working, security-audited spike. Not ready for production.
 - **Security audit:** 0 of 10 exploits work in Chromium 159, Firefox 159 and WebKit 27.2.
-- **Tests:** all suites pass in all three engines (47 unit tests). The leak matrix is unchanged:
+- **Tests:** all suites pass in all three engines (47 unit tests); the PWX Guard extension spike passes in Chromium. The leak matrix is unchanged:
   without the extra protections, the Standard runtime leaks WebRTC in every engine, plus link
   preconnect in WebKit, which has no switch to stop either. That's a browser limit (see AUDIT.md).
 - **Main open item:** M4. The transparency log, revocation, key rotation with a waiting period,
@@ -24,7 +24,6 @@ them, and what's next.
 | Working copy | VPS: `~/PWX`, checked out on `spike`, clean |
 | Signing keys | VPS only: `~/.config/pwx-dev/dev-key.json` and `release-key.json` (never in the repo) |
 | Python venv with Playwright and browsers | VPS: `~/PWX/spike/.venv` (gitignored) |
-| Old copies, to delete by hand | VPS: `~/_to_delete/pwx-spike`, plus `~/pwx-audit` (now in `spike/audit/`) |
 | Prometheus | nothing PWX-related |
 
 Browser tests and anything that signs must run on the VPS: it has the browsers and the keys.
@@ -46,7 +45,7 @@ Files in `app-origin/`, `loader/` and `lib/` are pinned by hash and covered by t
 After changing any of them:
 
 ```bash
-echo 0.4.2 > VERSION                 # bump the release version
+echo 0.4.3 > VERSION                 # bump the release version
 node tools/pin-runtime.mjs           # re-pins runtime hashes in app-origin/sw.js and the release key
 node tools/build-packages.mjs        # rebuilds the test packages
 node tools/make-release.mjs          # signs local/release.json with the release key
@@ -89,6 +88,7 @@ tests and `package.json` aren't pinned, so they can change freely.
 | #4, #5 | Audit setup moved into `spike/audit/`, SECURITY.md, CI on `spike` |
 | #6 | Strict apps get `PwxUI.store` only when the manifest declares storage (release 0.4.1) |
 | #7 | Offline test on a saved profile; the WebKit `sw.js` item was a test-setup artifact |
+| #9 | Erasing an app needs the user's click on the app's own origin (release 0.4.2); PWX Guard extension spike (`spike/extension/`, Chromium) |
 
 ## Waiting on Altru
 
@@ -98,10 +98,9 @@ tests and `package.json` aren't pinned, so they can change freely.
    `gpg -d pwx-keys.tar.gpg | tar -x -C ~/.config`.
 2. **Turn on private vulnerability reporting:** repo Settings → Security → Private vulnerability
    reporting → Enable. SECURITY.md tells people to use it.
-3. **Delete the old copies** on the VPS: `~/_to_delete/pwx-spike` and `~/pwx-audit`.
-4. **Delete merged branches** on GitHub: `audit/harness-and-ci`, `chore/safeaudit-ci`,
-   `chore/spike-security`, `docs/license-about`, `docs/license-about-spike`,
-   `docs/security-main`, `fix/storage-cap`, `fix/webkit-offline`.
+
+Done on 2026-11-16: the old VPS copies (`~/_to_delete/pwx-spike`, `~/pwx-audit`) and the merged
+GitHub branches are deleted.
 
 ## What's next
 
@@ -110,12 +109,19 @@ tests and `package.json` aren't pinned, so they can change freely.
    - revocation of a compromised key or a bad release
    - key rotation with a waiting period, so a stolen key can't instantly replace the real one
    - update policies (who may publish an update, how loaders check)
-2. **Package format.** Keep the PWX manifest and signature as the standard. Later, move the
+2. **PWX Guard extension, from spike to something usable** (see AUDIT.md, "PWX Guard"). In order:
+   - make the app origins' `sw.js` byte-stable (no server-side substitution) and cover it, since
+     that is what protects app data from a compromised host
+   - a Firefox build that checks the exact bytes the browser receives, closing the timing gap
+   - decide whether the extension should become the loader itself (no host to trust at all)
+3. **Erase confirmation:** Firefox and WebKit can't tell whether the box is covered. Look for a
+   stronger defence against a tricked click there.
+4. **Package format.** Keep the PWX manifest and signature as the standard. Later, move the
    container from base64 JSON to a compact binary format that can be read in parts (no 33% size
    overhead, no 64 MB limit). Optionally export a Signed Web Bundle for Chrome once Isolated Web
    Apps can be installed by anyone. Signed Web Bundles are Chrome-only, and Google controls an
    allowlist for managed installs.
-3. **Production hosting:** a real subdomain per app instead of the local ports the spike uses.
-4. **Not implemented yet:** `storage.persistent`, storage limits for Standard apps, and the
+5. **Production hosting:** a real subdomain per app instead of the local ports the spike uses.
+6. **Not implemented yet:** `storage.persistent`, storage limits for Standard apps, and the
    `files`, `clipboard` and `sync` capabilities (validated only).
-5. Merge `spike` into `main` once M4 is designed and the spec is stable.
+7. Merge `spike` into `main` once M4 is designed and the spec is stable.

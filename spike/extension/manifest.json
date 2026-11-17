@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "PWX Guard (spike)",
+  "version": "0.0.1",
+  "description": "Blocks a PWX loader's service worker file unless it matches a signed PWX release.",
+  "permissions": ["declarativeNetRequest", "webNavigation", "storage"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "background": { "service_worker": "guard.js", "type": "module" },
+  "action": { "default_title": "PWX Guard" }
+}
