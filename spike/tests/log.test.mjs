@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { b64 } from "../lib/pwx-verify.mjs";
-import { Log, Witness, newKey, pub, signEntry, keyId, receipt, verifyReceipt, verifyCheckpoint } from "../log/log.mjs";
+import { Log, Witness, newKey, pub, signEntry, keyId, receipt, verifyReceipt, verifyCheckpoint, addCosigs } from "../log/log.mjs";
 import { checkRelease, verifyFullView, WAIT } from "../log/authors.mjs";
 
 const HOUR = 3600e3, DAY = 24 * HOUR, T0 = Date.UTC(2026, 10, 17);
@@ -13,16 +13,17 @@ async function world() {
   now = T0;
   const logKey = await newKey(), log = new Log(ORIGIN, logKey, clock);
   const wk = await Promise.all([newKey(), newKey(), newKey()]);
-  const witnesses = wk.map((k, i) => new Witness(`w${i + 1}`, k, pub(logKey), ORIGIN));
-  const trust = { origin: ORIGIN, log: pub(logKey), witnesses: wk.map(pub), quorum: 2 };
+  const witnesses = wk.map((k, i) => new Witness(`w${i + 1}.pwx.example`, k, log.vkey, ORIGIN, clock));
+  const trust = { origin: ORIGIN, log: log.vkey, witnesses: witnesses.map((w) => w.vkey), quorum: 2 };
   // The log publishes a checkpoint; every witness checks it extends what it saw, and co-signs.
+  // cp is the checkpoint note with every co-signature line added; cosigs are those lines.
   const publish = async (l = log) => {
-    const cp = await l.checkpoint(); const cosigs = [];
+    const note = await l.checkpoint(); const cosigs = [];
     for (const w of witnesses) {
-      const proof = w.last ? (await l.consistency(w.last.size, cp.body.size)).map((h) => b64.enc(h)) : [];
-      const c = await w.cosign(cp, proof); if (c) cosigs.push(c);
+      const proof = w.last ? (await l.consistency(w.last.size, l.leaves.length)).map((h) => b64.enc(h)) : [];
+      const c = await w.cosign(note, proof); if (c) cosigs.push(c);
     }
-    return { cp, cosigs };
+    return { cp: addCosigs(note, cosigs), cosigs, note };
   };
   const d1 = await newKey(), rec = await newKey();
   await log.append(await signEntry(d1, { type: "key-event", op: "create", author: "val", keys: [pub(d1)], recovery: await keyId(pub(rec)) }));
@@ -33,8 +34,8 @@ const rel = (k, manifest, version = "1.0.0") => signEntry(k, { type: "release", 
 test("a logged release passes offline with its receipt", async () => {
   const w = await world();
   now += HOUR; const i = await w.log.append(await rel(w.d1, "m-1"));
-  const { cp, cosigs } = await w.publish();
-  const r = await receipt(w.log, i, cp, cosigs);
+  const { cp } = await w.publish();
+  const r = await receipt(w.log, i, cp);
   const leaf = await verifyReceipt(JSON.parse(JSON.stringify(r)), w.trust);   // as if read from a file
   assert.equal(leaf.entry.manifest, "m-1");
   assert.deepEqual(await checkRelease(w.log.leaves, "val", "m-1", now), { ok: true });
@@ -43,9 +44,9 @@ test("a logged release passes offline with its receipt", async () => {
 test("a release missing from the log is rejected", async () => {
   const w = await world();
   now += HOUR; const i = await w.log.append(await rel(w.d1, "m-1"));
-  const { cp, cosigs } = await w.publish();
+  const { cp } = await w.publish();
   assert.equal((await checkRelease(w.log.leaves, "val", "m-unlogged", now)).reason, "not in the log");
-  const r = await receipt(w.log, i, cp, cosigs);
+  const r = await receipt(w.log, i, cp);
   const other = await rel(w.d1, "m-unlogged");                                  // validly signed, never logged
   r.leaf = { ...other, loggedAt: r.leaf.loggedAt };
   await assert.rejects(verifyReceipt(r, w.trust), /not in the log/);
@@ -54,15 +55,24 @@ test("a release missing from the log is rejected", async () => {
 test("forged receipts are rejected", async () => {
   const w = await world();
   for (let n = 0; n < 5; n++) { now += HOUR; await w.log.append(await rel(w.d1, `m-${n}`)); }
-  const { cp, cosigs } = await w.publish();
-  const good = await receipt(w.log, 3, cp, cosigs);
+  const { cp, cosigs, note } = await w.publish();
+  const good = await receipt(w.log, 3, cp);
   const clone = () => JSON.parse(JSON.stringify(good));
   let r = clone(); r.proof[0] = b64.enc(new Uint8Array(32)); await assert.rejects(verifyReceipt(r, w.trust), /not in the log/);
-  r = clone(); r.checkpoint.body.root = b64.enc(new Uint8Array(32)); await assert.rejects(verifyReceipt(r, w.trust), /not signed by the log/);
-  r = clone(); r.cosigs = r.cosigs.slice(0, 1); await assert.rejects(verifyReceipt(r, w.trust), /1 of 2 witnesses/);
-  r = clone(); r.cosigs = [r.cosigs[0], r.cosigs[0]]; await assert.rejects(verifyReceipt(r, w.trust), /1 of 2 witnesses/);
-  const stranger = await newKey(); const fake = await new Witness("x", stranger, w.trust.log, ORIGIN).cosign(cp, []);
-  r = clone(); r.cosigs = [r.cosigs[0], fake]; await assert.rejects(verifyReceipt(r, w.trust), /1 of 2 witnesses/);
+  const root = note.split("\n")[2];
+  r = clone(); r.checkpoint = r.checkpoint.replace(root, b64.enc(new Uint8Array(32))); await assert.rejects(verifyReceipt(r, w.trust), /not signed by the log/);
+  r = clone(); r.checkpoint = addCosigs(note, cosigs.slice(0, 1)); await assert.rejects(verifyReceipt(r, w.trust), /1 of 2 witnesses/);
+  r = clone(); r.checkpoint = addCosigs(note, [cosigs[0], cosigs[0]]); await assert.rejects(verifyReceipt(r, w.trust), /1 of 2 witnesses/);
+  const stranger = await newKey();
+  const fake = await new Witness("x.example", stranger, w.trust.log, ORIGIN, clock).cosign(note, []);
+  r = clone(); r.checkpoint = addCosigs(note, [cosigs[0], fake]); await assert.rejects(verifyReceipt(r, w.trust), /1 of 2 witnesses/);
+  // A stranger using a real witness's name: the key ID doesn't match, so the line is ignored.
+  const impostor = await new Witness("w2.pwx.example", stranger, w.trust.log, ORIGIN, clock).cosign(note, []);
+  r = clone(); r.checkpoint = addCosigs(note, [cosigs[0], impostor]); await assert.rejects(verifyReceipt(r, w.trust), /1 of 2 witnesses/);
+  // A witness line whose timestamp was changed no longer verifies.
+  const line = cosigs[1], raw = b64.dec(line.split(" ").at(-1).trim()); raw[11] ^= 1;
+  const bumped = line.slice(0, line.lastIndexOf(" ") + 1) + b64.enc(raw) + "\n";
+  r = clone(); r.checkpoint = addCosigs(note, [cosigs[0], bumped]); await assert.rejects(verifyReceipt(r, w.trust), /1 of 2 witnesses/);
   r = clone(); r.leaf.entry.version = "9.9.9"; await assert.rejects(verifyReceipt(r, w.trust), /signature invalid/);
 });
 
@@ -88,7 +98,7 @@ test("split view: witnesses refuse a history that was rewritten or forked", asyn
   const forked = await w.publish(fork);
   assert.equal(forked.cosigs.length, 0, "no witness co-signs the fork");
   assert.ok(w.witnesses.every((x) => x.evidence.length === 1), "every witness keeps the conflicting checkpoint as evidence");
-  await assert.rejects(verifyCheckpoint(forked.cp, forked.cosigs, w.trust), /0 of 2 witnesses/);
+  await assert.rejects(verifyCheckpoint(forked.cp, w.trust), /0 of 2 witnesses/);
   // Same size, different contents is refused too.
   const same = new Log(ORIGIN, w.logKey, clock);
   for (const l of w.log.leaves.slice(0, 4)) await same.append({ entry: l.entry, sig: l.sig });
@@ -155,19 +165,19 @@ test("a client with the whole log can tell if anything was hidden from it", asyn
   const w = await world();
   now += HOUR; await w.log.append(await rel(w.d1, "m-bad"));
   now += HOUR; await w.log.append(await signEntry(w.d1, { type: "revoke", author: "val", manifest: "m-bad" }));
-  const { cp, cosigs } = await w.publish();
-  assert.ok(await verifyFullView(w.log.leaves, cp, cosigs, w.trust, verifyCheckpoint));
+  const { cp } = await w.publish();
+  assert.ok(await verifyFullView(w.log.leaves, cp, w.trust));
   const hidden = w.log.leaves.filter((l) => l.entry.type !== "revoke");      // the revocation left out
-  await assert.rejects(verifyFullView(hidden, cp, cosigs, w.trust, verifyCheckpoint), /wrong size/);
+  await assert.rejects(verifyFullView(hidden, cp, w.trust), /wrong size/);
   const swapped = [...w.log.leaves]; swapped[2] = { ...swapped[2], loggedAt: swapped[2].loggedAt + 1 };
-  await assert.rejects(verifyFullView(swapped, cp, cosigs, w.trust, verifyCheckpoint), /don't match/);
+  await assert.rejects(verifyFullView(swapped, cp, w.trust), /don't match/);
 });
 
 test("hardware keys (ECDSA P-256) work in the log like any other key", async () => {
   const w = await world(); const hw = await newKey("p256");
   now += HOUR; await w.log.append(await signEntry(w.d1, { type: "key-event", op: "rotate", author: "val", add: [pub(hw)], remove: [] }));
   now += WAIT + HOUR; const i = await w.log.append(await rel(hw, "from-hardware"));
-  const { cp, cosigs } = await w.publish();
-  await verifyReceipt(await receipt(w.log, i, cp, cosigs), w.trust);
+  const { cp } = await w.publish();
+  await verifyReceipt(await receipt(w.log, i, cp), w.trust);
   assert.ok((await checkRelease(w.log.leaves, "val", "from-hardware", now)).ok);
 });
