@@ -397,6 +397,8 @@ function a2hsApplies() {
   return !(navigator.standalone === true || matchMedia("(display-mode: standalone)").matches);
 }
 function showA2hsGuide() {
+  // Not on an app's own home address: there the page offers to install that app, not PWX.
+  if (appHome) return;
   try {
     if (!a2hsApplies() || localStorage.getItem(A2HS_SEEN)) return;
     localStorage.setItem(A2HS_SEEN, "1"); // shown once: it won't come back, dismissed or not
@@ -446,6 +448,8 @@ function sayInstall(ui, text) { ui.hint.textContent = text; ui.hint.hidden = fal
 function howToInstall(ui, what) {
   const ua = navigator.userAgent;
   if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) {
+    // The illustrated guide already says this; don't show the same step twice.
+    if (state.a2hs === "shown" && !appHome) return;
     sayInstall(ui, `To put ${what} on your home screen: tap Share, then Add to Home Screen.`);
   } else if (/Android/.test(ua)) {
     setTimeout(() => { if (!installPrompt && ui.btn.hidden) sayInstall(ui, `To install ${what}: open your browser's menu and tap Install app or Add to Home screen.`); }, 3000);

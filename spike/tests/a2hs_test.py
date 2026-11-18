@@ -24,11 +24,14 @@ def main():
     try:
         with sync_playwright() as p:
             browser = getattr(p, a.browser).launch()
-            def visible(ua, standalone=False, reloads=0, click=False):
+            hint_twice = []
+            def visible(ua, standalone=False, reloads=0, click=False, path="/"):
                 ctx = browser.new_context(user_agent=ua)
                 if standalone: ctx.add_init_script("Object.defineProperty(navigator, 'standalone', { value: true })")
-                page = ctx.new_page(); page.goto(LOADER + "/"); page.wait_for_function(ready, timeout=15000)
+                page = ctx.new_page(); page.goto(LOADER + path); page.wait_for_function(ready, timeout=15000)
                 first = page.locator("#a2hs").is_visible()
+                # The guide and the plain install hint must not say the same thing at once.
+                if first and page.locator("#install-hint").is_visible(): hint_twice.append(ua)
                 if click: page.click("#a2hs-close"); first = (first, page.locator("#a2hs").is_visible())
                 for _ in range(reloads):
                     page.reload(); page.wait_for_function(ready, timeout=15000)
@@ -44,6 +47,8 @@ def main():
             check("iPad: no guide", not visible(IPAD)[0])
             check("desktop Safari: no guide", not visible(DESKTOP)[0])
             check("iPhone Safari from the Home Screen: no guide", not visible(IPHONE, standalone=True)[0])
+            check("iPhone Safari on an app's own home address: no PWX guide", not visible(IPHONE, path="/app/org.example.notes/")[0])
+            check("iPhone Safari: the plain install hint stays hidden while the guide shows", not hint_twice)
             browser.close()
     finally:
         server.terminate()

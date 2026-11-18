@@ -4,7 +4,7 @@
 // The public key is written to local/release.pub. In a real distribution it is compiled into
 // the signed pwx-local binary; the OS code signature is the root of trust.
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { canonicalize, sha256, b64 } from "../lib/pwx-verify.mjs";
@@ -24,7 +24,7 @@ const walk = (d) => readdirSync(d).flatMap((n) => statSync(join(d, n)).isDirecto
 const files = {};
 for (const dir of ["lib", "loader", "app-origin"]) {
   for (const abs of walk(join(ROOT, dir)).sort()) {
-    files[relative(ROOT, abs)] = await sha256(new Uint8Array(readFileSync(abs)));
+    files[relative(ROOT, abs).split(sep).join("/")] = await sha256(new Uint8Array(readFileSync(abs)));
   }
 }
 const release = { version, files };
