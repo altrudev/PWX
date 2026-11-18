@@ -30,16 +30,19 @@ allowed to do. An early demo; please don't keep important data there.
 
 ## Status
 
-Early design, with a working, security-audited spike (spike release 0.4.1). On this branch (`spike`):
+Early design, with a working, security-audited spike (spike release **0.4.8**). On this branch (`spike`):
 
 - [`docs/SPEC.md`](docs/SPEC.md): **PWX Specification v0 (Draft)**, as built
 - [`docs/AUDIT.md`](docs/AUDIT.md): security audit, fixes and cross-browser results
 - [`docs/VISION.md`](docs/VISION.md): what PWX is for, and the design items that follow from it
+- [`docs/M4.md`](docs/M4.md): approved design for stopping stolen keys: device keys with two-device approval, a witnessed public log, revocation and key rotation
+- [`docs/SIGNER-SPIKE.md`](docs/SIGNER-SPIKE.md) and [`docs/LOG-SPIKE.md`](docs/LOG-SPIKE.md): the first prototypes of that design
+- [`docs/HANDOVER.md`](docs/HANDOVER.md): where the project stands and how to work on it
 - [`spike/`](spike/): verifier, packer, hosted loader, local Verified-tier loader (`pwx-local`), Strict runtime, a Notes app and the test suites
 
-Every exploit from the audit is blocked in Chromium, Firefox and WebKit. Not built yet: the
-transparency log, revocation, key rotation, sync and device pairing (audit item M4). PWX is not
-ready for production use.
+Every exploit from the audit is blocked in Chromium, Firefox and WebKit. The Signer and the public
+log work as prototypes, but the loader doesn't require them yet, so a stolen publisher key still
+can't be stopped. PWX is not ready for production use.
 
 ## Branches
 
