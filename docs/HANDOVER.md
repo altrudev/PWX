@@ -1,6 +1,6 @@
 # PWX handover
 
-For the next person (or chat) picking up PWX. Last updated 2026-11-17, at spike release **0.4.2**.
+For the next person (or chat) picking up PWX. Last updated 2026-11-18, at spike release **0.4.8**.
 Read [`../README.md`](../README.md) for what PWX is, [`SPEC.md`](SPEC.md) for how it works and
 [`AUDIT.md`](AUDIT.md) for the security record, [`VISION.md`](VISION.md) for where PWX is going,
 [`M4.md`](M4.md) for the approved signing and log design, [`SIGNER-SPIKE.md`](SIGNER-SPIKE.md) for
@@ -11,7 +11,7 @@ them, and what's next.
 
 - **Stage:** early design, with a working, security-audited spike. Not ready for production.
 - **Security audit:** 0 of 10 exploits work in Chromium 159, Firefox 159 and WebKit 27.2.
-- **Tests:** all suites pass in all three engines (47 unit tests); the PWX Guard extension spike passes in Chromium. The leak matrix is unchanged:
+- **Tests:** all suites pass in all three engines (47 unit tests; app installs, the iPhone guide and the log and Signer spikes have their own suites); the PWX Guard extension spike passes in Chromium. The leak matrix is unchanged:
   without the extra protections, the Standard runtime leaks WebRTC in every engine, plus link
   preconnect in WebKit, which has no switch to stop either. That's a browser limit (see AUDIT.md).
 - **Hosted tier, honestly:** a compromised host can still swap a service worker. The loader locks
@@ -22,14 +22,17 @@ them, and what's next.
   and runtime that runs on everything, not a builder or a store. Hosted is the front door.
 - **M4 (approved design, [`M4.md`](M4.md)):** stop stolen keys with device keys and two-device
   approval, then a witnessed public log, receipts, revocation, automatic key rotation and update
-  policies. **Built so far:** the Signer spike only. Until the log exists, a publisher whose key
+  policies. **Built so far:** the Signer spike and the log spike ([`LOG-SPIKE.md`](LOG-SPIKE.md), `spike/log/`). Until the log exists, a publisher whose key
   is stolen still can't be stopped in the shipped loader.
 - **Signer spike ([`SIGNER-SPIKE.md`](SIGNER-SPIKE.md), `spike/signer/`):** passphrase-locked
   browser keys, ECDSA P-256 format for hardware keys, two-device approval; 20/20 in all three
   engines, and a copied browser profile can't sign. Not built: chip access in `pwx-local` /
   ALTRU OS (the VPS has no TPM). Not used by the loader yet.
 
-**Live demo:** [pwx.altru.dev](https://pwx.altru.dev), release 0.4.3, since 2026-11-17.
+**Live demo:** [pwx.altru.dev](https://pwx.altru.dev), release **0.4.7** (since 2026-11-17).
+`spike` is at **0.4.8**, which adds the iPhone Add to Home Screen guide; it isn't deployed yet
+(see "Updating the live demo"). Installable since 0.4.5: the library at `/library/`, and each app
+at its own home address `/app/<id>/`.
 
 ## Where everything lives
 
@@ -63,7 +66,7 @@ Files in `app-origin/`, `loader/` and `lib/` are pinned by hash and covered by t
 After changing any of them:
 
 ```bash
-echo 0.4.3 > VERSION                 # bump the release version
+echo 0.4.9 > VERSION                 # bump the release version
 node tools/pin-runtime.mjs           # re-pins runtime hashes in app-origin/sw.js and the release key
 node tools/build-packages.mjs        # rebuilds the test packages
 node tools/make-release.mjs          # signs local/release.json with the release key
@@ -93,8 +96,13 @@ the loader's address (`app1`-`app4` + its host), so the signed files are the sam
   `audit` CI check (safeaudit) to pass before merging.
 - Commits made on the VPS use the identity `Altru.dev`
   `<266135212+altrudev@users.noreply.github.com>`.
-- The VPS can push to GitHub. Force-pushes and branch deletions were refused in the last
-  session, so add new commits rather than rewriting history.
+- The VPS can push to GitHub. Claude can't force-push or delete branches (refused every time),
+  so add new commits rather than rewriting history, and leave branch deletion to Altru.
+- **Outside contributors:** pull requests from forks need Altru to approve the CI run on GitHub
+  ("Approve and run"). Contributors can't sign, so anything touching `lib/`, `loader/` or
+  `app-origin/` must be re-pinned and re-signed here: cherry-pick their commit onto a branch (it
+  keeps their authorship), sign on the VPS, run the suites, merge, then close their PR with a
+  link. That's how #23 landed.
 
 ## Gotchas
 
@@ -112,7 +120,7 @@ the loader's address (`app1`-`app4` + its host), so the signed files are the sam
 - **Strict apps get storage only when declared** (`"storage": { "local": true }`, since 0.4.1).
   Test apps that need storage must declare it.
 
-## Recent work (Nov 15–17, 2026)
+## Recent work (Nov 15–18, 2026)
 
 | PR | Change |
 | --- | --- |
@@ -126,15 +134,30 @@ the loader's address (`app1`-`app4` + its host), so the signed files are the sam
 | #11 | `VISION.md`: what PWX is for; ownership, earned results, opening .pwx files |
 | #12 | `M4.md`: approved design for the log, revocation, rotation, update policies and the PWX Signer |
 | #13 | Signer spike: two-device approval, passphrase-locked keys, hardware key format (`SIGNER-SPIKE.md`) |
+| #15 | Log spike: witnessed append-only log, receipts, key history with a 7-day rotation wait (`LOG-SPIKE.md`) |
+| #16 | Live demo at pwx.altru.dev (0.4.3) and site redesign (0.4.4) |
+| #25 | Installable demo, per-app home-screen installs, immediate loader worker updates (0.4.5–0.4.7, merged 2026-11-18; had been live but unmerged) |
+| #26 | iPhone Add to Home Screen guide by Ismail Duran (from #23), fitted to the 0.4.5 install hints; `make-release.mjs` writes `/` paths on Windows too (0.4.8) |
+
+Closed without merging: #24 (icons), which 0.4.5 had already shipped.
 
 ## Waiting on Altru
 
-Nothing right now. Done on 2026-11-17: the signing keys are backed up (an encrypted
-`pwx-keys.asc` on Altru's phone; a second copy off the phone is still recommended; restore with
-`gpg -d pwx-keys.asc | tar -xz -C ~/.config`), and private vulnerability reporting is on.
+1. **Delete the merged branches** on GitHub (Claude isn't allowed to): `docs/handover-nov16`,
+   `docs/m4-design`, `docs/vision`, `exp/hosted-demo`, `exp/log`, `exp/signer`,
+   `contrib/a2hs-guide`.
+2. **Deploy 0.4.8** to pwx.altru.dev when you want the iPhone guide live (steps above).
+3. A second copy of the key backup off the phone is still recommended.
 
-Done on 2026-11-16: the old VPS copies (`~/_to_delete/pwx-spike`, `~/pwx-audit`) and the merged
-GitHub branches are deleted.
+Done on 2026-11-17: the signing keys are backed up (an encrypted `pwx-keys.asc` on Altru's phone;
+restore with `gpg -d pwx-keys.asc | tar -xz -C ~/.config`), and private vulnerability reporting
+is on.
+
+## Contributors
+
+- **Ismail Duran** (GitHub `P1LOTRX`): iPhone guide (#23, landed via #26), icons (#24, superseded).
+  Careful PRs with tests and honest notes on what wasn't run. Works on Adım, an Android habit app
+  (adimapp.me). Open issues #18, #20–#22 are good next contributions.
 
 ## What's next
 
@@ -142,10 +165,11 @@ Decided on 2026-11-16: the vision ([`VISION.md`](VISION.md)), the M4 design with
 ([`M4.md`](M4.md), end of file), and option 3 for signing keys ([`SIGNER-SPIKE.md`](SIGNER-SPIKE.md)).
 QUARANTINE.md is still awaiting Altru's approval: ask before building any of it.
 
-1. **M4 log spike (started 2026-11-17).** A tiled, append-only log on the VPS with two witnesses,
-   receipts inside packages, and the loader checking them. Tests from M4.md: a release missing
-   from the log, a forged receipt, a split view, a revoked release, a rotation inside the waiting
-   period, a recovery-key cancel.
+1. **M4 log, beyond the spike** (spike done 2026-11-17, all tests pass; see LOG-SPIKE.md, "Not
+   built yet"): write the log as static files in the C2SP formats so ordinary hosting can serve
+   it, run witnesses as separate services (issue #22), put the Signer's two-device approvals in
+   release entries, receipts inside packages with the loader checking them (soft mode first),
+   revocation list download, and witness clock checks.
 2. **Hardware keys:** a small native helper for `pwx-local` (TPM on Windows/Linux, Secure Enclave
    on macOS) and ALTRU OS (Android Keystore), signing ECDSA P-256 approvals in the Signer spike's
    format. Must be tested on real machines (Prometheus, a Mac, an Android phone), not the VPS.
@@ -156,8 +180,8 @@ QUARANTINE.md is still awaiting Altru's approval: ask before building any of it.
 5. **QUARANTINE.md**, once Altru decides. Part 1 must keep push, background sync and offline work
    possible as capabilities of the shell (VISION.md). The Signer would live on the same origin.
 6. **VISION.md design items** after the log: lineage and blessings, licenses and ownership
-   transfers, earned credentials, the packer web page, the self-opening .pwx, the iPhone install
-   guide.
+   transfers, earned credentials, the packer web page (issue #21), signed folders (issue #20),
+   the self-opening .pwx. (The iPhone install guide is done: 0.4.8.)
 7. **Smaller items:** PWX Guard extension (only if still wanted after QUARANTINE.md); erase
    confirmation in Firefox and WebKit; binary package format; `storage.persistent`, Standard-app
    storage limits, and the `files`, `clipboard` and `sync` capabilities (validated only).
