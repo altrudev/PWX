@@ -29,10 +29,10 @@ them, and what's next.
   engines, and a copied browser profile can't sign. Not built: chip access in `pwx-local` /
   ALTRU OS (the VPS has no TPM). Not used by the loader yet.
 
-**Live demo:** [pwx.altru.dev](https://pwx.altru.dev), release **0.4.7** (since 2026-11-17).
-`spike` is at **0.4.9** (0.4.8: the iPhone Add to Home Screen guide; 0.4.9: saving to the home
-screen saves only the app, which then opens full screen). Neither is deployed yet (see "Updating
-the live demo"). Installable since 0.4.5: the library at `/library/`, and each app
+**Live demo:** [pwx.altru.dev](https://pwx.altru.dev), release **0.4.9** (since 2026-11-18; live
+demo test 8/8 in all three engines). 0.4.8 added the iPhone Add to Home Screen guide; 0.4.9 makes
+saving to the home screen save only the app, which then opens full screen. The previous site
+(0.4.7) is backed up on WHC as `~/pwx-backup-0.4.7.tgz`. Installable since 0.4.5: the library at `/library/`, and each app
 at its own home address `/app/<id>/`.
 
 ## Where everything lives
@@ -153,9 +153,8 @@ Closed without merging: #24 (icons), which 0.4.5 had already shipped.
 
 1. **Delete the merged branches** on GitHub (Claude isn't allowed to): `docs/handover-nov16`,
    `docs/m4-design`, `docs/vision`, `exp/hosted-demo`, `exp/log`, `exp/signer`,
-   `contrib/a2hs-guide`, `docs/cla`, `docs/cla-main`, `fix/app-only-home`.
-2. **Deploy 0.4.9** to pwx.altru.dev when you want the iPhone guide and app-only home-screen
-   installs live (steps above). Then check on a real iPhone and Android phone: add Notes to the
+   `contrib/a2hs-guide`, `docs/cla`, `docs/cla-main`, `fix/app-only-home`, `docs/deploy-049`.
+2. **Check 0.4.9 on a real iPhone and Android phone** (deployed 2026-11-18): add Notes to the
    home screen from a running Notes page and confirm the icon is Notes and it opens full screen.
 3. A second copy of the key backup off the phone is still recommended.
 
