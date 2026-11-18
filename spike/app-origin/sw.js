@@ -7,7 +7,7 @@
 const PINNED = {
   "/__pwx/bootstrap.html": "sha256-BuBZIfowENCCnXHFskrn2aIoytmmHDhWjzFxpCQWYLo=",
   "/__pwx/bootstrap.js": "sha256-qtJneMpOtY9izMDrnyEUM8GgdhK1AKN6o6lZTGWRe6U=",
-  "/__pwx/verify.mjs": "sha256-XXlvLVEpGLStSb2Ra2X4Q5yRZq2MQTqy9qHyTD64r0s=",
+  "/__pwx/verify.mjs": "sha256-WFTp05j+WTcVZxaSDQOtr+GTpJVqiFY4AU6DVaQH1ao=",
   "/__pwx/strict.html": "sha256-uGg0JedU1IFHz3RYE0kPVzdLwjEZw5vw1MkDMV1UVYE=",
   "/__pwx/renderer.js": "sha256-0iISv0YjRJQbTOsckJNZP2VIK19Uc7L8PlevSLekkTQ=",
   "/__pwx/guard.js": "sha256-T5G742sbqECNwXC5VeaEMRdp6J5JL0nRwNQrr3474YI=",

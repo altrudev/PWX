@@ -20,9 +20,9 @@ for (const d of [L, join(L, "lib"), join(L, "packages"), join(L, "fonts"), join(
 const cp = (from, to) => copyFileSync(join(ROOT, from), to);
 
 // ---------- loader host ----------
-for (const f of ["index.html", "how-it-works.html", "loader.mjs", "loader.css", "store.mjs", "config.mjs", "sw.js", "fonts/syne.woff2", "fonts/dm-sans.woff2", "manifest.webmanifest",
+for (const f of ["index.html", "how-it-works.html", "log-trust.mjs", "loader.mjs", "loader.css", "store.mjs", "config.mjs", "sw.js", "fonts/syne.woff2", "fonts/dm-sans.woff2", "manifest.webmanifest",
   "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png"]) cp(`loader/${f}`, join(L, f));
-cp("lib/pwx-verify.mjs", join(L, "lib/pwx-verify.mjs"));
+for (const f of ["pwx-verify.mjs", "pwx-receipt.mjs", "pwx-merkle.mjs", "pwx-note.mjs"]) cp(`lib/${f}`, join(L, "lib", f));
 cp("local/release.json", join(L, "loader-release.json"));
 for (const p of ["notes"]) cp(`packages/${p}.pwx.json`, join(L, "packages", `${p}.pwx.json`));
 const loaderCsp = `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src ${APPS.join(" ")}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;

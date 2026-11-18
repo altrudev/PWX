@@ -4,7 +4,10 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import { pack } from "./pack.mjs";
+import { logPackages } from "../log/devlog.mjs";
+import { keyFromJwk } from "../log/log.mjs";
 
 const ROOT = join(fileURLToPath(import.meta.url), "../..");
 const out = join(ROOT, "packages");
@@ -19,8 +22,11 @@ if (!existsSync(key)) {
 }
 // "declared" reuses the leak-test code but declares the canary as an allowed host
 // (loopback http is accepted only in dev mode), to show declared hosts still work.
+const built = [];
 for (const [app, code, dev] of [["evil", "evil", false], ["declared", "evil", true], ["evil-strict", "evil-strict", false], ["notes", "notes", false]]) {
-  const pkg = await pack(join(ROOT, "apps", code), join(ROOT, "apps", app, "manifest.template.json"), key, { allowLoopbackHttp: dev });
-  writeFileSync(join(out, `${app}.pwx.json`), pkg);
-  console.log("built", `packages/${app}.pwx.json`);
+  built.push([app, await pack(join(ROOT, "apps", code), join(ROOT, "apps", app, "manifest.template.json"), key, { allowLoopbackHttp: dev })]);
 }
+// Every test package carries a receipt from the dev log (M4 soft mode); the log's static files
+// go to devlog/ (not committed).
+const logged = await logPackages(built.map(([, t]) => t), await keyFromJwk(JSON.parse(readFileSync(key, "utf8"))), join(ROOT, "devlog"));
+built.forEach(([app], i) => { writeFileSync(join(out, `${app}.pwx.json`), logged[i]); console.log("built", `packages/${app}.pwx.json (logged)`); });

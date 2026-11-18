@@ -43,15 +43,42 @@ First spike of the public log in [`M4.md`](M4.md). Code: `spike/log/`. Tests:
 uses): no witness history check, no waiting period, any key can recover, revocations ignored,
 receipts without the inclusion proof. Every one made the matching test fail.
 
+## Static files and receipts (2026-11-18)
+
+- **C2SP formats.** Checkpoints are signed notes (`lib/pwx-note.mjs`); witnesses add
+  cosignature/v1 lines; the log is written as tlog-tiles static files (`log/tiles.mjs`). A reader
+  fetches only the tiles it needs and proves entries against the signed root; it falls back to a
+  full tile when a partial one is gone.
+- **Tool:** `tools/pwx-log.mjs` (`init`, `append`, `witness`, `cosign`, `trust`). A witness reads
+  the log over HTTP like any client and builds the consistency proof from the tiles itself.
+- **Checked by other people's code.** `spike/interop/` (Go) verifies a PWX log folder with
+  `golang.org/x/mod/sumdb/note` (log signature), `transparency-dev/formats` (witness
+  co-signatures) and `golang.org/x/mod/sumdb/tlog` (every tile and every entry's inclusion proof).
+- **Receipts in packages, loader soft mode** (release 0.4.10): see SPEC.md section 4.1.
+  `tools/build-packages.mjs` logs every test package in a development log (`log/devlog.mjs`; its
+  keys sit with the other dev keys, and its files in `spike/devlog/`, not committed).
+
+| Test | Result |
+| --- | --- |
+| Tiles vs the in-memory tree: same root, inclusion and consistency proofs and entries, sizes 1 to 65537 (level-2 tiles), a reader at an older size after partial tiles are gone | pass (`tiles.test.mjs`) |
+| Changed tiles or entries are caught against the signed root | pass |
+| Signed notes: format, verifier keys, malformed text refused; a stranger using a witness's name, a duplicate line, a changed timestamp | all refused |
+| Static log on `python -m http.server` (no PWX code): two witnesses co-sign over HTTP; Go verifies the log signature, both co-signatures and all 561 entries from tiles; a rewritten history is refused by the witness (evidence kept) and by Go | pass (`run_static_log.sh`) |
+| Receipts: a logged package passes; another app's, version's, contents' or publisher's receipt, a changed proof, time, entry or signature, a missing witness, and a receipt from another log are refused | pass (`receipt.test.mjs`) |
+| Loader in Chromium, Firefox, WebKit: logged package shown as logged at install and launch; no receipt and a wrong receipt shown as not logged, still installed | 6/6 each (`receipt_test.py`) |
+
 ## Not built yet
 
-1. **Public hosting:** the spike keeps the log in memory. Next: write it as static files in the
-   public C2SP formats (signed-note checkpoints, tiles), so ordinary hosting can serve it.
+1. **Public hosting** of a real log: the format and tool are ready; the dev log isn't served
+   anywhere yet, and receipts come from it.
 2. **Witnesses as separate services,** run by separate people, and finding the first witnesses.
 3. **Release entries carrying the two-device approvals** from the Signer spike.
-4. **Receipts inside packages, and the loader checking them** (soft mode first: warn, then
-   refuse).
+4. **Required mode:** the loader shows receipts (soft mode, 0.4.10) but doesn't refuse
+   unlogged releases yet; it also doesn't check key history or revocations.
 5. **Revocation list download** for loaders, and **monitors** in the PWX Signer that alert the
    author and offer one-tap revoke.
-6. **Clock:** the log's timestamps decide the waiting period. Witnesses should refuse checkpoints
-   whose time goes backwards or runs far ahead; not built.
+6. **Clock:** the log's timestamps (`loggedAt` in each entry) decide the waiting period, and a
+   C2SP checkpoint carries no time of its own, so a dishonest log could backdate an entry.
+   Witnesses can close this because the tiles are public: before co-signing, read the new
+   entries and refuse if any `loggedAt` goes backwards or is ahead of the witness's clock. The
+   witness co-signature time also bounds when an entry existed. Not built.

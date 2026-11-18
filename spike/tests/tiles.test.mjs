@@ -91,6 +91,10 @@ test("signed notes, checkpoints and co-signatures", async () => {
   const vk = await N.vkey(origin, N.ED25519, logKey.key);
   assert.deepEqual(await N.parseVkey(vk), { name: origin, type: 1, key: logKey.key });
   await assert.rejects(N.parseVkey(vk.replace(/\+[0-9a-f]{8}\+/, "+00000000+")), /doesn't match/);
+  // Key data with "+" in its base64 (found by a flaky run): 32 bytes of 0xfb encode to "+/v7...".
+  const plus = b64.enc(new Uint8Array(32).fill(0xfb));
+  assert.ok(plus.includes("+"));
+  assert.deepEqual(await N.parseVkey(await N.vkey("w.example", N.COSIG_V1, plus)), { name: "w.example", type: 4, key: plus });
   // Malformed text is refused.
   for (const bad of [body, note.replace("\n\n", "\n"), note.replace("—", "-"), note.replace("\n3\n", "\n03\n"), note + "x"]) {
     await assert.rejects(N.verifyCheckpointNote(bad, trust));

@@ -1,6 +1,8 @@
 import { verifyPackage, buildHeaders, cmpVersion, canonicalize, sha256, strictParse, PwxError } from "/lib/pwx-verify.mjs";
 import { library } from "/store.mjs";
 import { TEST } from "/config.mjs";
+import { checkReceipt } from "/lib/pwx-receipt.mjs";
+import { LOG_TRUST } from "/log-trust.mjs";
 
 const LOADER = location.origin;
 // Hosted spike: each app gets its own origin from a fixed pool (ports stand in for per-app
@@ -196,12 +198,25 @@ async function fingerprint(publisher) {
   return b.match(/.{4}/g).join(" ");
 }
 
-function describe(m, fp) {
+// M4 soft mode: is this release in the public log? Checked offline from the receipt in the package.
+// A missing or bad receipt is shown, never refused (yet).
+async function logStatus(text, manifest) {
+  const pkg = strictParse(text);
+  if (!pkg.receipt) return { logged: false, reason: "no receipt" };
+  try { return await checkReceipt(pkg.receipt, manifest, pkg.sig.key, LOG_TRUST); }
+  catch (err) { return { logged: false, reason: err.message }; }
+}
+const logLine = (s) => s.logged
+  ? `In the public log: checked on this device, with ${s.witnesses} witness signatures.`
+  : `Not in the public log (${s.reason}). It can still be installed for now; later, PWX will refuse releases that aren't logged.`;
+
+function describe(m, fp, log) {
   const c = m.capabilities ?? {};
   const hosts = c.network?.connect ?? [];
   return [
     `${m.name ?? m.id} ${m.version}`,
     `Publisher key ${fp}`,
+    ...(log ? [logLine(log)] : []),
     hosts.length ? `Can send data to: ${hosts.join(", ")}` : "Cannot send data to any host.",
     // Spike finding: no engine enforces CSP "webrtc 'block'" for pages, and WebKit also
     // lets preconnect through. Strict apps run only in a worker, so neither applies.
@@ -220,8 +235,8 @@ function showLines(lines) {
 }
 
 // Consent is a decision: nothing is installed until the user confirms (test builds auto-confirm).
-function confirmInstall(manifest, fp, existing) {
-  showLines([existing ? `Update from ${existing.version}` : "Install this app?", ...describe(manifest, fp)]);
+function confirmInstall(manifest, fp, existing, log) {
+  showLines([existing ? `Update from ${existing.version}` : "Install this app?", ...describe(manifest, fp, log)]);
   state.phase = "consent";
   if (TEST) return Promise.resolve(true);
   return new Promise((resolve) => {
@@ -260,7 +275,8 @@ async function install(text, source = null) {
     if (order === 0 && prev !== hash) throw new PwxError("rollback", `version ${manifest.version} was already installed with different content`);
   }
   const unchanged = existing && existing.version === manifest.version;
-  if (!unchanged && !(await confirmInstall(manifest, await fingerprint(manifest.publisher), existing))) {
+  const log = (state.logStatus = await logStatus(text, manifest));
+  if (!unchanged && !(await confirmInstall(manifest, await fingerprint(manifest.publisher), existing, log))) {
     throw new PwxError("loader", "install cancelled");
   }
   await library.put({ ...(existing ?? {}), id: manifest.id, name: manifest.name ?? manifest.id, version: manifest.version,
@@ -282,7 +298,8 @@ async function launch(id) {
   const APP = await appOrigin(manifest.id, record);
   state.appOrigin = APP;
   $("library").hidden = true;
-  showLines(describe(manifest, await fingerprint(manifest.publisher)));
+  state.logStatus = await logStatus(record.text, manifest);
+  showLines(describe(manifest, await fingerprint(manifest.publisher), state.logStatus));
 
   status("Installing verified files on the app origin…");
   // The app origin verifies the package again itself; it doesn't take files or headers from here.

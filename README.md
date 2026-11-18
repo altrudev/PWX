@@ -30,7 +30,7 @@ allowed to do. An early demo; please don't keep important data there.
 
 ## Status
 
-Early design, with a working, security-audited spike (spike release **0.4.9**). On this branch (`spike`):
+Early design, with a working, security-audited spike (spike release **0.4.10**). On this branch (`spike`):
 
 - [`docs/SPEC.md`](docs/SPEC.md): **PWX Specification v0 (Draft)**, as built
 - [`docs/AUDIT.md`](docs/AUDIT.md): security audit, fixes and cross-browser results
@@ -40,9 +40,10 @@ Early design, with a working, security-audited spike (spike release **0.4.9**). 
 - [`docs/HANDOVER.md`](docs/HANDOVER.md): where the project stands and how to work on it
 - [`spike/`](spike/): verifier, packer, hosted loader, local Verified-tier loader (`pwx-local`), Strict runtime, a Notes app and the test suites
 
-Every exploit from the audit is blocked in Chromium, Firefox and WebKit. The Signer and the public
-log work as prototypes, but the loader doesn't require them yet, so a stolen publisher key still
-can't be stopped. PWX is not ready for production use.
+Every exploit from the audit is blocked in Chromium, Firefox and WebKit. The public log is
+published as static files in the standard C2SP formats, and packages carry log receipts that the
+loader checks offline, but only shows for now (soft mode). The Signer is a prototype. Until the
+loader requires both, a stolen publisher key still can't be stopped. PWX is not ready for production use.
 
 ## Branches
 

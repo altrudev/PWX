@@ -217,12 +217,15 @@ export async function sha256(bytes) {
   return "sha256-" + b64.enc(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
 }
 
-// pkg: { manifest: <JSON text>, sig: { alg, key, sig }, files: { path: base64 } }
+// pkg: { manifest: <JSON text>, sig: { alg, key, sig }, files: { path: base64 }, receipt?: { ... } }
+// The receipt (M4) proves the release is in the public log; it's added after signing, so it isn't
+// covered by the signature, and lib/pwx-receipt.mjs checks it on its own.
 export async function verifyPackage(pkgText, opts = {}) {
   const pkg = strictParse(pkgText);
   for (const k of Object.keys(pkg)) {
-    if (!["manifest", "sig", "files"].includes(k)) throw new PwxError("package", `unknown field ${k}`);
+    if (!["manifest", "sig", "files", "receipt"].includes(k)) throw new PwxError("package", `unknown field ${k}`);
   }
+  if ("receipt" in pkg && (typeof pkg.receipt !== "object" || pkg.receipt === null || Array.isArray(pkg.receipt))) throw new PwxError("package", "receipt must be an object");
   if (typeof pkg.manifest !== "string") throw new PwxError("package", "manifest must be text");
   const manifest = validateManifest(strictParse(pkg.manifest), opts);
   const canonical = te.encode(canonicalize(manifest));

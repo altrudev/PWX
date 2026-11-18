@@ -11,17 +11,20 @@ is marked **not implemented**. Security findings and test results are in [`AUDIT
 
 ## 1. Package
 
-A package is one JSON file (`.pwx` / `.pwx.json`) with exactly three fields:
+A package is one JSON file (`.pwx` / `.pwx.json`) with three fields, and optionally a fourth:
 
 ```json
 {
   "manifest": "<the manifest, as JSON text>",
   "sig": { "alg": "ed25519", "key": "<base64 raw public key>", "sig": "<base64 signature>" },
-  "files": { "app/index.html": "<base64 bytes>", "...": "..." }
+  "files": { "app/index.html": "<base64 bytes>", "...": "..." },
+  "receipt": { "leaf": {}, "index": 0, "proof": [], "checkpoint": "<signed note>" }
 }
 ```
 
 - Any other field rejects the package.
+- `receipt` (optional, since 0.4.10) proves the release is in the public log (section 4.1). It's
+  added after signing, so the signature doesn't cover it; it's checked on its own.
 - `manifest` is carried as text. The signature covers the **canonical JSON** of the parsed
   manifest (sorted keys, no whitespace), so formatting can't change what was signed.
 - Every package is parsed with the **strict JSON parser**: duplicate keys rejected, at most 64
@@ -92,6 +95,31 @@ Every install **and every launch** runs the same checks (`verifyPackage`):
 5. No unlisted files, no missing files, and every file matches its hash.
 6. Updates must be newer: an older version, or the same version with different contents, is
    rejected (rollback).
+
+### 4.1 Log receipts (M4, soft mode)
+
+The public log ([`M4.md`](M4.md)) is published as static files in the C2SP formats, so any web
+host can serve it and other people's tools can read it:
+
+- **Checkpoint:** `checkpoint`, a [signed note](https://c2sp.org/signed-note) whose body is a
+  [tlog-checkpoint](https://c2sp.org/tlog-checkpoint) (`<origin>\n<size>\n<base64 root>\n`),
+  signed by the log's Ed25519 key (key name = origin), plus witnesses'
+  [cosignature/v1](https://c2sp.org/tlog-cosignature) lines (timestamped Ed25519).
+- **Tiles:** `tile/<L>/<N>[.p/<W>]` and entry bundles `tile/entries/<N>[.p/<W>]`, as in
+  [tlog-tiles](https://c2sp.org/tlog-tiles). Each entry is the canonical JSON of
+  `{ entry, sig, loggedAt }`; leaf hashes are RFC 6962.
+- **Release entry:** `{ type: "release", author, app, version, manifest: <sha256 of the canonical
+  manifest>, signer: { alg, key } }`, signed by the package's publisher key.
+- **Receipt:** `{ leaf, index, proof, checkpoint }`: the logged entry, its inclusion proof, and a
+  checkpoint with the log's signature and enough witness co-signatures.
+
+The loader checks a receipt **offline**, at install and at every launch: a checkpoint signed by
+the pinned log key (`loader/log-trust.mjs`) and co-signed by at least `quorum` of the pinned
+witnesses; the entry signed by this package's publisher key, for this app, this version and this
+exact manifest; and the inclusion proof against the checkpoint's root. **Soft mode:** the result
+is shown on the install screen ("In the public log" or "Not in the public log (reason)"); a
+missing or bad receipt doesn't block the install yet. Key history, revocation and the waiting
+period ([`M4.md`](M4.md) sections 4–5) are not checked by the loader yet.
 
 ## 5. Loader
 
@@ -229,6 +257,8 @@ and per-app origins from the user's own machine.
 | A rolled-back or swapped loader update | version must increase; same-version swap refused; updates only on click | blocked (AUDIT M6) |
 | A compromised host replaces the loader's `sw.js` | the running page locks down; app origins verify packages themselves and pin id, publisher and version | **reduced, not closed**: the replaced loader can't install forged or older app code, but can request a wipe; use pwx-local |
 | A replaced loader asks an app origin to erase its data | the app origin asks the user itself, in a frame the loader can't click | blocked without the user's click (AUDIT) |
+| A release that isn't in the public log | log receipt checked offline at install and launch | **shown, not refused** (M4 soft mode, 0.4.10) |
+| A log that shows different people different histories | witnesses co-sign only checkpoints that extend what they saw; loaders need a quorum | blocked in tests; the spike's witnesses aren't independent yet |
 | A compromised host replaces an app origin's `sw.js` | none in the hosted tier; PWX Guard extension spike covers the loader's worker only | **open (browser limit)**: needs a check outside the host (pwx-local, an extension, or signed bundles) |
 
 ## 9. Not implemented yet
@@ -236,4 +266,5 @@ and per-app origins from the user's own machine.
 - The capabilities marked **not implemented** in section 3.
 - Per-app subdomains for hosted mode (the spike uses 20 ports).
 - Moving notes from the old `pwx-notes` database.
-- Other spec features tracked as audit finding M4.
+- Other spec features tracked as audit finding M4: required mode for receipts, key history and
+  revocation in the loader, independent witnesses, the revocation list download, monitors.
