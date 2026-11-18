@@ -11,6 +11,7 @@
 import { b64 } from "../lib/pwx-verify.mjs";
 import { keyId, verifySig, bytes } from "./log.mjs";
 import * as M from "./merkle.mjs";
+import { verifyCheckpointNote } from "./note.mjs";
 
 export const WAIT = 7 * 24 * 3600 * 1000;   // decided by Altru, 2026-11-16
 
@@ -70,10 +71,11 @@ export async function checkRelease(leaves, author, manifest, now) {
 
 // A client that fetched the whole log checks it's the same log the witnesses signed, so the
 // log can't hide a revocation or a recovery from one client.
-export async function verifyFullView(leaves, cp, cosigs, trust, verifyCheckpoint) {
-  await verifyCheckpoint(cp, cosigs, trust);
-  if (leaves.length !== cp.body.size) throw new Error("view: wrong size");
+// checkpoint: a witnessed checkpoint note.
+export async function verifyFullView(leaves, checkpoint, trust) {
+  const cp = await verifyCheckpointNote(checkpoint, trust);
+  if (leaves.length !== cp.size) throw new Error("view: wrong size");
   const r = await M.root(await Promise.all(leaves.map((l) => M.leafHash(bytes(l)))));
-  if (b64.enc(r) !== cp.body.root) throw new Error("view: entries don't match the witnessed log");
+  if (b64.enc(r) !== cp.root) throw new Error("view: entries don't match the witnessed log");
   return true;
 }
