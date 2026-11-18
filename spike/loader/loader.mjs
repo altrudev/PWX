@@ -28,8 +28,8 @@ if (!/^[a-z-]*$/.test(mode)) throw new PwxError("loader", "bad mode");
 const appHomeUrl = (r) => `/app/${r.id}/` + (/^[a-z0-9-]+$/.test(r.source ?? "") ? `?src=${r.source}` : "");
 // An app's own home address, /app/<id>/, opens that app directly. It can be installed on its own,
 // so the home screen shows the app, not the library. (The service worker gives the page that
-// app's install manifest and icon.)
-const appHome = location.pathname.match(/^\/app\/([a-z0-9][a-z0-9.-]{0,99})\/$/)?.[1] ?? null;
+// app's install manifest and icon.) An app opened any other way moves here once it runs.
+let appHome = location.pathname.match(/^\/app\/([a-z0-9][a-z0-9.-]{0,99})\/$/)?.[1] ?? null;
 const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 
 // A local loader (pwx-local) answers /__pwx/mode itself; the hosted loader's service worker
@@ -142,6 +142,7 @@ async function checkServiceWorkerChange() {
 function lockdown() {
   if (state.locked) return;
   state.locked = true;
+  document.body.classList.remove("app-mode", "app-standalone", "show-facts");
   for (const id of ["library", "consent", "loader-update", "a2hs"]) $(id).hidden = true;
   showIntro(false);
   for (const f of document.querySelectorAll("iframe.bootstrap")) f.remove();
@@ -299,9 +300,52 @@ async function launch(id) {
     app.src = `${APP}/${manifest.entry}${mode ? "#" + mode : ""}`;
   }
   $("stage").append(app);
+  const appName = record.name ?? manifest.name ?? id;
+  await becomeAppPage({ ...record, id }, appName);
   state.phase = "running";
-  offerAppInstall({ ...record, id }, record.name ?? manifest.name);
+  offerAppInstall({ ...record, id }, appName);
 }
+
+// Once an app runs, the page is that app's: its own address, install manifest, icon and name. So
+// "Add to Home Screen" or "Install" saves the app, never the PWX page around it, and the page
+// shows the app alone. The per-app files come from the hosted loader's service worker, so this
+// needs it (pwx-local still links to the app's home address instead).
+async function becomeAppPage(r, name) {
+  if (state.local || !("serviceWorker" in navigator) || !/^[a-z0-9][a-z0-9.-]{0,99}$/.test(r.id)) return;
+  if (!(await controller())) return; // on a first visit the worker takes over a moment after "ready"
+
+  const home = `/app/${r.id}/`;
+  if (location.pathname !== home) {
+    const q = new URLSearchParams(location.search);
+    for (const k of ["pkg", "open", "src"]) q.delete(k);
+    if (/^[a-z0-9-]+$/.test(r.source ?? "")) q.set("src", r.source);
+    const qs = q.toString();
+    history.replaceState(history.state, "", home + (qs ? `?${qs}` : ""));
+    appHome = r.id;
+    installPrompt = null; // an earlier prompt would install the PWX library, not this app
+    $("install").hidden = true;
+  }
+  const set = (sel, attr, val) => document.querySelector(sel)?.setAttribute(attr, val);
+  set('link[rel="manifest"]', "href", `${home}manifest.webmanifest`);
+  set('link[rel="apple-touch-icon"]', "href", `${home}icon-180.png`);
+  set('link[rel="icon"]', "href", `${home}icon-192.png`);
+  set('link[rel="icon"]', "type", "image/png");
+  set('meta[name="apple-mobile-web-app-title"]', "content", name);
+  document.title = name;
+  // App mode: the app fills the page. In a browser tab a thin strip names the app and links back
+  // to PWX; opened from the home screen there's nothing but the app.
+  document.body.classList.add("app-mode");
+  if (standalone) document.body.classList.add("app-standalone");
+  state.appMode = true;
+  if (standalone) return;
+  $("app-strip-name").textContent = name;
+  for (const id of ["app-strip-home", "app-strip-name", "app-facts-btn"]) $(id).hidden = false;
+  $("app-install").hidden = false;
+}
+$("app-facts-btn").addEventListener("click", () => {
+  const on = document.body.classList.toggle("show-facts");
+  $("app-facts-btn").setAttribute("aria-expanded", String(on));
+});
 
 // The bootstrap only listens to its parent, and only on a channel the parent hands it.
 async function bootstrapCall(APP, msg, ok, failed, { keep = true, visible = false } = {}) {
@@ -457,22 +501,29 @@ function howToInstall(ui, what) {
 }
 function setupInstall() {
   if (standalone) return;
-  const ui = installUi(appHome ? "app-" : "");
-  if (!ui.box) return;
+  // The page can turn from the front page into an app's page, so look up the right UI each time.
+  const current = () => installUi(appHome ? "app-" : "");
   addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault(); installPrompt = e;
     if (appHome && state.phase !== "running") return; // shown once the app is running
-    ui.btn.hidden = false; ui.hint.hidden = true; ui.box.hidden = false;
+    const ui = current(); ui.btn.hidden = false; ui.hint.hidden = true; ui.box.hidden = false;
   });
-  addEventListener("appinstalled", () => { ui.box.hidden = true; installPrompt = null; });
-  ui.btn.addEventListener("click", async () => {
-    if (!installPrompt) return;
-    const p = installPrompt; installPrompt = null; ui.btn.hidden = true;
-    p.prompt();
-    const choice = await p.userChoice.catch(() => null);
-    if (choice?.outcome !== "accepted") sayInstall(ui, "Not installed. You can install later from your browser's menu.");
+  addEventListener("appinstalled", () => {
+    installPrompt = null;
+    const ui = current(); ui.btn.hidden = true; ui.hint.hidden = true;
+    if (!appHome) ui.box.hidden = true; // an app's strip stays: it names the app
   });
-  if (!appHome) howToInstall(ui, "PWX");
+  for (const prefix of ["", "app-"]) {
+    const ui = installUi(prefix);
+    ui.btn.addEventListener("click", async () => {
+      if (!installPrompt) return;
+      const p = installPrompt; installPrompt = null; ui.btn.hidden = true;
+      p.prompt();
+      const choice = await p.userChoice.catch(() => null);
+      if (choice?.outcome !== "accepted") sayInstall(ui, "Not installed. You can install later from your browser's menu.");
+    });
+  }
+  if (!appHome) howToInstall(current(), "PWX");
 }
 setupInstall();
 function offerAppInstall(r, name) {

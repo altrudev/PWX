@@ -26,8 +26,30 @@ def main():
         app.get_by_label("Title", exact=True).fill("From the library")
         expect(app.get_by_text("Saved on this device")).to_be_visible(timeout=5000)
         origin = page.evaluate("() => window.__pwx.appOrigin")
-        link = page.locator("#app-install-link")
-        check("a running app offers its own home-screen install", link.is_visible() and link.get_attribute("href") == HOME + "?src=notes", link.get_attribute("href"))
+        # Opened from a link, the page becomes the app's own: saving it saves the app, not PWX.
+        loc = page.evaluate("() => ({ path: location.pathname, search: location.search, title: document.title, man: document.querySelector('link[rel=manifest]').getAttribute('href'), touch: document.querySelector('link[rel=apple-touch-icon]').getAttribute('href'), apple: document.querySelector('meta[name=apple-mobile-web-app-title]').content })")
+        check("an app opened from a link moves to its own address", loc["path"] == HOME and loc["search"] == "?src=notes", loc)
+        check("...and its page names, installs and shows the app, not PWX", loc["title"] == "Notes" and loc["apple"] == "Notes"
+              and loc["man"] == HOME + "manifest.webmanifest" and loc["touch"] == HOME + "icon-180.png", loc)
+        vh = page.evaluate("() => innerHeight")
+        frame_h = page.locator("iframe.app").bounding_box()["height"]
+        check("app mode: only the app and a thin strip, no PWX page around it",
+              not page.locator("header.bar").is_visible() and not page.locator("footer.foot").is_visible()
+              and not page.locator("#intro").is_visible() and not page.locator("#consent").is_visible()
+              and page.locator("#app-strip-name").inner_text() == "Notes" and frame_h >= vh * 0.85, f"iframe {frame_h:.0f}px of {vh}px")
+        check("the strip links back to the PWX library", page.locator("#app-strip-home").get_attribute("href") == "/library/")
+        page.get_by_role("button", name="What it can do").click()
+        check("what the app can do is one tap away", page.locator("#consent").is_visible() and "Notes 1.0.0" in page.locator("#consent").inner_text())
+        page.get_by_role("button", name="What it can do").click()
+        if a.browser == "chromium":
+            cdp0 = ctx.new_cdp_session(page); time.sleep(1)
+            errs0 = cdp0.send("Page.getInstallabilityErrors").get("installabilityErrors")
+            got0 = cdp0.send("Page.getAppManifest")
+            check("Chromium would install the app, not PWX, from that page", errs0 == [] and got0.get("url", "").endswith(HOME + "manifest.webmanifest"), (errs0, got0.get("url")))
+        page.reload()
+        page.wait_for_function("() => window.__pwx && ['running', 'rejected', 'library'].includes(window.__pwx.phase)", timeout=20000)
+        expect(app.get_by_text("From the library")).to_be_visible(timeout=10000)
+        check("reloading keeps the app, with its data", page.evaluate("() => location.pathname") == HOME)
 
         page.goto(LOADER + "/")
         expect(page.get_by_role("link", name="Put Notes on your home screen")).to_have_count(1, timeout=10000)
@@ -61,6 +83,17 @@ def main():
         if a.shot:
             icon = page.evaluate("async () => { const r = await fetch('" + HOME + "icon-512.png'); const b = await r.blob(); return await new Promise((ok) => { const f = new FileReader(); f.onload = () => ok(f.result); f.readAsDataURL(b); }); }")
             import base64; open(a.shot, "wb").write(base64.b64decode(icon.split(",", 1)[1]))
+
+        # Opened from the home screen: nothing but the app.
+        home_ctx = b.new_context(viewport={"width": 400, "height": 760})
+        home_ctx.add_init_script("Object.defineProperty(navigator, 'standalone', { value: true })")
+        hp = home_ctx.new_page(); hp.goto(LOADER + HOME + "?src=notes")
+        hp.wait_for_function("() => window.__pwx && ['running', 'rejected'].includes(window.__pwx.phase)", timeout=20000)
+        hb = hp.locator("iframe.app").bounding_box()
+        check("from the home screen: the app fills the screen, no strip, no PWX page",
+              hp.evaluate("() => window.__pwx.phase") == "running" and not hp.locator("#app-install").is_visible()
+              and not hp.locator("header.bar").is_visible() and hb["height"] >= 760 * 0.97 and hb["width"] >= 400 * 0.97, hb)
+        home_ctx.close()
 
         # A home-screen copy can start with an empty library (iPhone keeps its storage apart).
         fresh = b.new_context(viewport={"width": 900, "height": 700}).new_page()
