@@ -30,16 +30,19 @@ allowed to do. An early demo; please don't keep important data there.
 
 ## Status
 
-Early design, with a working, security-audited spike (spike release 0.4.1). On this branch (`spike`):
+Early design, with a working, security-audited spike (spike release **0.4.8**). On this branch (`spike`):
 
 - [`docs/SPEC.md`](docs/SPEC.md): **PWX Specification v0 (Draft)**, as built
 - [`docs/AUDIT.md`](docs/AUDIT.md): security audit, fixes and cross-browser results
 - [`docs/VISION.md`](docs/VISION.md): what PWX is for, and the design items that follow from it
+- [`docs/M4.md`](docs/M4.md): approved design for stopping stolen keys: device keys with two-device approval, a witnessed public log, revocation and key rotation
+- [`docs/SIGNER-SPIKE.md`](docs/SIGNER-SPIKE.md) and [`docs/LOG-SPIKE.md`](docs/LOG-SPIKE.md): the first prototypes of that design
+- [`docs/HANDOVER.md`](docs/HANDOVER.md): where the project stands and how to work on it
 - [`spike/`](spike/): verifier, packer, hosted loader, local Verified-tier loader (`pwx-local`), Strict runtime, a Notes app and the test suites
 
-Every exploit from the audit is blocked in Chromium, Firefox and WebKit. Not built yet: the
-transparency log, revocation, key rotation, sync and device pairing (audit item M4). PWX is not
-ready for production use.
+Every exploit from the audit is blocked in Chromium, Firefox and WebKit. The Signer and the public
+log work as prototypes, but the loader doesn't require them yet, so a stolen publisher key still
+can't be stopped. PWX is not ready for production use.
 
 ## Branches
 
@@ -57,6 +60,12 @@ ALTRU.dev makes privacy-first, local-first software: free tools for people who n
 productivity apps that keep your data on your own devices. PWX comes from the same idea: you
 shouldn't have to take an app's word for what it does with your data.
 
+## Contributing
+
+Contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md). Before your first pull
+request, read and accept the [Contributor License Agreement](CLA.md): you keep the copyright in
+your work, and you give the project a license to use it.
+
 ## License
 
 Copyright 2026 Valentyn Rukhaylo (Altru), ALTRU.dev.
@@ -65,3 +74,8 @@ Licensed under the [Apache License, Version 2.0](LICENSE). You may use, modify a
 PWX, including commercially, as long as you keep the copyright and license notices (see
 [`NOTICE`](NOTICE)). The license also grants a patent license from contributors, and it comes
 with no warranty.
+
+**Trademarks:** "PWX", "Progressive Web eXecutable", "ALTRU.dev" and "ALTRU", and their logos, are
+not licensed under Apache-2.0. Forks are welcome, but must use a different name and must not
+present themselves as official PWX releases. Official releases are the ones signed with the PWX
+release key.

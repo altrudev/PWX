@@ -8,6 +8,20 @@ See [`docs/VISION.md`](docs/VISION.md) for the why and the live demo at
 It's early. The most useful things right now are people who try to break it, people who build
 small apps on it, and people who help with the pieces listed under "Good first issues".
 
+## Before your first pull request
+
+**Read and accept the [Contributor License Agreement](CLA.md).** You keep the copyright in your
+work. You give the project a license to use it, including under other license terms in the
+future (CLA sections 2 and 7). Every pull request has an agreement box in its description: tick
+it, or the `contributor-agreement` check fails and the pull request can't be merged.
+
+Ticking the box means you accept the CLA, as it stands in this repository on that day, for that
+pull request and every later contribution. If you contribute as part of your job, check that your
+employer allows it first (CLA section 5).
+
+Please also sign off each commit (`git commit -s`). It adds a `Signed-off-by:` line confirming you
+wrote the change or have the right to submit it.
+
 ## Ways to help
 
 - **Try to break it.** The [security audit](docs/AUDIT.md) lists the attacks already stopped. Found
@@ -47,7 +61,10 @@ release, so tests will refuse them until you re-pin and re-sign with your own de
 node tools/pin-runtime.mjs && node tools/build-packages.mjs && node tools/make-release.mjs
 ```
 
-Your keys are created in `~/.config/pwx-dev/` on first run. Never commit keys.
+Your keys are created in `~/.config/pwx-dev/` on first run. Never commit keys. Don't commit the
+re-pinned `app-origin/sw.js` and `loader/sw.js`, or the `local/release.json` made with your keys,
+either: a maintainer re-pins and signs with the real release key, runs every suite, and merges
+your commit with your authorship kept.
 
 ## How changes are made
 
@@ -55,9 +72,15 @@ Your keys are created in `~/.config/pwx-dev/` on first run. Never commit keys.
 - Say what you changed, why, and how you tested it. Security-relevant changes need a test that fails
   without the fix: switch your fix off once and show the test catches it.
 - Run the tests that touch what you changed in all three engines (Chromium, Firefox, WebKit).
-- The `audit` check (a static scan) must pass before merging.
+- Tick the CLA box in the pull request. GitHub asks a maintainer to approve CI runs for
+  first-time contributors, so checks may wait a little.
+- The `contributor-agreement` and `audit` (a static scan) checks must pass before merging.
 - Write for people, not machines: plain words, short sentences.
 
-## Licence
+## Licence and credit
 
-By contributing, you agree your contribution is licensed under Apache-2.0, like the rest of PWX.
+PWX is released under Apache-2.0. Contributions are accepted under the
+[Contributor License Agreement](CLA.md), which lets the project release your contribution under
+Apache-2.0 and, if ever needed, under other terms. You keep your copyright, and you're credited in
+the commit history and release notes. The names "PWX" and "ALTRU.dev" aren't licensed to
+contributors or forks (see the README).

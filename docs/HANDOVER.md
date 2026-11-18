@@ -98,6 +98,11 @@ the loader's address (`app1`-`app4` + its host), so the signed files are the sam
   `<266135212+altrudev@users.noreply.github.com>`.
 - The VPS can push to GitHub. Claude can't force-push or delete branches (refused every time),
   so add new commits rather than rewriting history, and leave branch deletion to Altru.
+- **Contributor License Agreement (since 2026-11-18):** outside contributors must accept
+  [`CLA.md`](../CLA.md) by ticking the box in the pull request template; the
+  `contributor-agreement` check enforces it (Altru's own PRs are exempt). They keep copyright and
+  license their work to the project, including for other license terms later, as with Lullwire.
+  Contributions made before the CLA (#23, Ismail Duran) are under Apache-2.0 only.
 - **Outside contributors:** pull requests from forks need Altru to approve the CI run on GitHub
   ("Approve and run"). Contributors can't sign, so anything touching `lib/`, `loader/` or
   `app-origin/` must be re-pinned and re-signed here: cherry-pick their commit onto a branch (it
