@@ -18,7 +18,16 @@ with sync_playwright() as p:
     check("front page explains PWX", page.get_by_role("heading", name="Apps that can only do what they say.").is_visible() and page.get_by_role("heading", name="Why PWX exists").is_visible())
     page.goto(a.url + "/how-it-works.html")
     check("how-it-works page opens with its diagrams", page.get_by_role("heading", name="How PWX works").is_visible() and page.locator("figure.diagram svg").count() == 3)
+    # Installable: a manifest with home-screen icons that all load (browsers use these to offer Install).
     page.goto(a.url + "/")
+    man = page.evaluate("""async () => {
+      const href = document.querySelector('link[rel=manifest]')?.href; if (!href) return 'no manifest link';
+      const m = await (await fetch(href)).json();
+      for (const i of m.icons) { const r = await fetch(new URL(i.src, href)); if (!r.ok) return 'icon ' + i.src + ' ' + r.status; }
+      const sizes = m.icons.map((i) => i.sizes).join(' ');
+      return m.display === 'standalone' && m.start_url && /192x192/.test(sizes) && /512x512/.test(sizes) ? 'ok' : 'incomplete manifest';
+    }""")
+    check("the demo can be installed on a phone or computer", man == "ok", man)
     page.get_by_role("link", name="Try the Notes app").click()
     page.wait_for_function("() => window.__pwx && ['consent', 'running', 'rejected'].includes(window.__pwx.phase)", timeout=30000)
     st = page.evaluate("() => window.__pwx")

@@ -2,6 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PWX: apps that can only do what they say</title>
 <meta name="description" content="PWX apps are signed packages that run in any browser, offline, and can only do what they declare. Try the live demo.">
+<link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icons/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"><meta name="theme-color" content="#1E1A2E"><meta name="apple-mobile-web-app-title" content="PWX">
 <link rel="stylesheet" href="/loader.css"></head>
 <body>
 <header class="bar">
@@ -18,6 +19,10 @@
     else, on your device, even offline.</p>
     <p class="actions"><a class="btn primary" href="/?pkg=notes">Try the Notes app</a>
       <a class="btn quiet" href="/how-it-works.html">See how it works</a></p>
+    <div id="install" class="install" hidden>
+      <button class="btn" id="install-btn" type="button" hidden>Install PWX on this device</button>
+      <p id="install-hint" class="fine" hidden></p>
+    </div>
     <p class="fine">Early demo by <a href="https://altru.dev">ALTRU.dev</a>. Please don't keep important data here yet.</p>
   </div>
 
@@ -104,6 +109,11 @@
 
 <section id="lock" role="alert" hidden></section>
 <section id="status" aria-live="polite">Starting…</section>
+<div id="app-install" class="install app-install" hidden>
+  <button class="btn primary" id="app-install-btn" type="button" hidden></button>
+  <a class="btn" id="app-install-link" hidden></a>
+  <p id="app-install-hint" class="fine" hidden></p>
+</div>
 <section id="library" class="panel" hidden>
   <h2>Your apps</h2>
   <ul id="apps"></ul>
