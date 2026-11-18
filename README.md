@@ -30,7 +30,7 @@ allowed to do. An early demo; please don't keep important data there.
 
 ## Status
 
-Early design, with a working, security-audited spike (spike release **0.4.8**). On this branch (`spike`):
+Early design, with a working, security-audited spike (spike release **0.4.9**). On this branch (`spike`):
 
 - [`docs/SPEC.md`](docs/SPEC.md): **PWX Specification v0 (Draft)**, as built
 - [`docs/AUDIT.md`](docs/AUDIT.md): security audit, fixes and cross-browser results

@@ -111,6 +111,14 @@ The loader installs, keeps and launches apps.
 - **Install consent:** before every install or update, the loader shows the app's name, version,
   capabilities and a short **publisher fingerprint**. Nothing installs without a click.
 - **Sideloading:** a `.pwx` file from disk installs through the same verification and consent.
+- **Home screen (hosted tier):** each installed app has its own home address, `/app/<id>/`. The
+  loader's service worker gives that page the app's own install manifest (`id`, `scope` and
+  `start_url` under `/app/<id>/`), name and icons, made on the device from the library. Once an
+  app is running, however it was opened, the page moves to that address, so "Add to Home Screen"
+  or "Install" saves the app, never the PWX page or library. There the app fills the page: in a
+  browser tab with a thin strip (the app's name, a link back to PWX, what it can do, install),
+  from the home screen with nothing else. The library installs separately, scoped to `/library/`.
+  pwx-local doesn't do this yet; it links to the app's home address instead.
 - **Bootstrap:** the loader frames the app origin's `/__pwx/bootstrap.html` and hands it a
   `MessageChannel` port and the signed package. The app origin doesn't trust the loader: the
   bootstrap verifies the signature and every file itself, computes the CSP itself, and keeps the

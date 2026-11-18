@@ -1,6 +1,6 @@
 # PWX handover
 
-For the next person (or chat) picking up PWX. Last updated 2026-11-18, at spike release **0.4.8**.
+For the next person (or chat) picking up PWX. Last updated 2026-11-18, at spike release **0.4.9**.
 Read [`../README.md`](../README.md) for what PWX is, [`SPEC.md`](SPEC.md) for how it works and
 [`AUDIT.md`](AUDIT.md) for the security record, [`VISION.md`](VISION.md) for where PWX is going,
 [`M4.md`](M4.md) for the approved signing and log design, [`SIGNER-SPIKE.md`](SIGNER-SPIKE.md) for
@@ -30,8 +30,9 @@ them, and what's next.
   ALTRU OS (the VPS has no TPM). Not used by the loader yet.
 
 **Live demo:** [pwx.altru.dev](https://pwx.altru.dev), release **0.4.7** (since 2026-11-17).
-`spike` is at **0.4.8**, which adds the iPhone Add to Home Screen guide; it isn't deployed yet
-(see "Updating the live demo"). Installable since 0.4.5: the library at `/library/`, and each app
+`spike` is at **0.4.9** (0.4.8: the iPhone Add to Home Screen guide; 0.4.9: saving to the home
+screen saves only the app, which then opens full screen). Neither is deployed yet (see "Updating
+the live demo"). Installable since 0.4.5: the library at `/library/`, and each app
 at its own home address `/app/<id>/`.
 
 ## Where everything lives
@@ -66,7 +67,7 @@ Files in `app-origin/`, `loader/` and `lib/` are pinned by hash and covered by t
 After changing any of them:
 
 ```bash
-echo 0.4.9 > VERSION                 # bump the release version
+echo 0.4.10 > VERSION                # bump the release version
 node tools/pin-runtime.mjs           # re-pins runtime hashes in app-origin/sw.js and the release key
 node tools/build-packages.mjs        # rebuilds the test packages
 node tools/make-release.mjs          # signs local/release.json with the release key
@@ -144,14 +145,19 @@ the loader's address (`app1`-`app4` + its host), so the signed files are the sam
 | #25 | Installable demo, per-app home-screen installs, immediate loader worker updates (0.4.5–0.4.7, merged 2026-11-18; had been live but unmerged) |
 | #26 | iPhone Add to Home Screen guide by Ismail Duran (from #23), fitted to the 0.4.5 install hints; `make-release.mjs` writes `/` paths on Windows too (0.4.8) |
 
+| #27, #28 | Contributor License Agreement, trademark note, CI check for the CLA box |
+| #29 | Home screen saves only the app: a running app's page becomes the app's own (address, manifest, icon, name) and shows the app alone (0.4.9) |
+
 Closed without merging: #24 (icons), which 0.4.5 had already shipped.
 
 ## Waiting on Altru
 
 1. **Delete the merged branches** on GitHub (Claude isn't allowed to): `docs/handover-nov16`,
    `docs/m4-design`, `docs/vision`, `exp/hosted-demo`, `exp/log`, `exp/signer`,
-   `contrib/a2hs-guide`.
-2. **Deploy 0.4.8** to pwx.altru.dev when you want the iPhone guide live (steps above).
+   `contrib/a2hs-guide`, `docs/cla`, `docs/cla-main`, `fix/app-only-home`.
+2. **Deploy 0.4.9** to pwx.altru.dev when you want the iPhone guide and app-only home-screen
+   installs live (steps above). Then check on a real iPhone and Android phone: add Notes to the
+   home screen from a running Notes page and confirm the icon is Notes and it opens full screen.
 3. A second copy of the key backup off the phone is still recommended.
 
 Done on 2026-11-17: the signing keys are backed up (an encrypted `pwx-keys.asc` on Altru's phone;
