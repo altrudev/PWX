@@ -57,6 +57,12 @@ ALTRU.dev makes privacy-first, local-first software: free tools for people who n
 productivity apps that keep your data on your own devices. PWX comes from the same idea: you
 shouldn't have to take an app's word for what it does with your data.
 
+## Contributing
+
+Contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md). Before your first pull
+request, read and accept the [Contributor License Agreement](CLA.md): you keep the copyright in
+your work, and you give the project a license to use it.
+
 ## License
 
 Copyright 2026 Valentyn Rukhaylo (Altru), ALTRU.dev.
@@ -65,3 +71,8 @@ Licensed under the [Apache License, Version 2.0](LICENSE). You may use, modify a
 PWX, including commercially, as long as you keep the copyright and license notices (see
 [`NOTICE`](NOTICE)). The license also grants a patent license from contributors, and it comes
 with no warranty.
+
+**Trademarks:** "PWX", "Progressive Web eXecutable", "ALTRU.dev" and "ALTRU", and their logos, are
+not licensed under Apache-2.0. Forks are welcome, but must use a different name and must not
+present themselves as official PWX releases. Official releases are the ones signed with the PWX
+release key.

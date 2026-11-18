@@ -1,0 +1,28 @@
+name: contributor-agreement
+# Every pull request from someone other than the maintainer must tick the CLA box (CLA.md).
+# Read-only: it only reads the pull request's description, passed in an environment variable
+# so nothing in it can run as a command.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the CLA box is ticked
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          ASSOCIATION: ${{ github.event.pull_request.author_association }}
+        run: |
+          if [ "$ASSOCIATION" = "OWNER" ]; then
+            echo "Maintainer pull request: no CLA needed."; exit 0
+          fi
+          if printf '%s' "$BODY" | grep -Eiq '^[[:space:]]*[-*][[:space:]]*\[[xX]\][[:space:]]*I have read the \[?PWX Contributor License Agreement'; then
+            echo "$AUTHOR accepted the PWX Contributor License Agreement (CLA.md)."
+          else
+            echo "::error::Please read CLA.md and tick the Contributor License Agreement box in the pull request description."
+            exit 1
+          fi
