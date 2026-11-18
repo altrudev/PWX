@@ -144,7 +144,6 @@ the loader's address (`app1`-`app4` + its host), so the signed files are the sam
 | #16 | Live demo at pwx.altru.dev (0.4.3) and site redesign (0.4.4) |
 | #25 | Installable demo, per-app home-screen installs, immediate loader worker updates (0.4.5–0.4.7, merged 2026-11-18; had been live but unmerged) |
 | #26 | iPhone Add to Home Screen guide by Ismail Duran (from #23), fitted to the 0.4.5 install hints; `make-release.mjs` writes `/` paths on Windows too (0.4.8) |
-
 | #27, #28 | Contributor License Agreement, trademark note, CI check for the CLA box |
 | #29 | Home screen saves only the app: a running app's page becomes the app's own (address, manifest, icon, name) and shows the app alone (0.4.9) |
 
