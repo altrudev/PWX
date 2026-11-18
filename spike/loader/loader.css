@@ -69,6 +69,16 @@ main > section, .bar, .foot { max-width: var(--wide); margin-left: auto; margin-
 .cant li::before { content: "✕"; color: var(--stop); }
 .facts-foot { font-size: 12.5px; color: var(--muted); margin: 10px 0 0; line-height: 1.45; }
 
+/* ---------- Add to Home Screen guide (iPhone Safari only) ---------- */
+main > .a2hs { display: flex; align-items: center; gap: 16px; margin-top: 8px; margin-bottom: 8px; padding-top: 14px; padding-bottom: 14px;
+  background: var(--wash); border-radius: 14px; }
+.a2hs-pic { flex: none; width: 56px; height: 56px; }
+.a2hs-tile { fill: var(--paper); stroke: var(--ink); stroke-width: 2.5; }
+.a2hs-arrow { fill: none; stroke: var(--ink); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.a2hs-text { flex: 1; min-width: 0; }
+.a2hs-text h2 { font-size: 18px; margin: 0 0 4px; }
+.a2hs-text p { margin: 0; font-size: 15px; line-height: 1.4; }
+
 /* ---------- steps (a real sequence, so numbered) ---------- */
 .steps { background: var(--wash); max-width: none; padding-top: 56px; padding-bottom: 56px; }
 .steps > * { max-width: calc(var(--wide) - 48px); margin-left: auto; margin-right: auto; }

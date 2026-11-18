@@ -105,7 +105,7 @@ async function checkServiceWorkerChange() {
 function lockdown() {
   if (state.locked) return;
   state.locked = true;
-  for (const id of ["library", "consent", "loader-update"]) $(id).hidden = true;
+  for (const id of ["library", "consent", "loader-update", "a2hs"]) $(id).hidden = true;
   showIntro(false);
   for (const f of document.querySelectorAll("iframe.bootstrap")) f.remove();
   for (const el of document.querySelectorAll("button, input, a.btn")) { el.disabled = true; el.removeAttribute("href"); }
@@ -340,6 +340,28 @@ $("file").addEventListener("change", async (e) => {
   }
   e.target.value = "";
 });
+
+// ---------- Add to Home Screen guide ----------
+// On iPhone, adding PWX to the Home Screen replaces an App Store. Teach it once, in Safari only:
+// not in other browsers (Chrome, Firefox, Edge and in-app browsers can't or don't add it the same
+// way), not on other devices, and not when the loader already runs from the Home Screen.
+const A2HS_SEEN = "pwx-a2hs-seen";
+function a2hsApplies() {
+  const ua = navigator.userAgent;
+  if (!/\biPhone\b/.test(ua) || !/\bSafari\//.test(ua)) return false;
+  if (/\b(CriOS|FxiOS|EdgiOS|OPiOS|GSA|DuckDuckGo|FBAN|FBAV|Instagram|Line\/|MicroMessenger)\b/.test(ua)) return false;
+  return !(navigator.standalone === true || matchMedia("(display-mode: standalone)").matches);
+}
+function showA2hsGuide() {
+  try {
+    if (!a2hsApplies() || localStorage.getItem(A2HS_SEEN)) return;
+    localStorage.setItem(A2HS_SEEN, "1"); // shown once: it won't come back, dismissed or not
+  } catch { return; } // no storage, so no way to show it only once: stay quiet
+  $("a2hs").hidden = false;
+  state.a2hs = "shown";
+  $("a2hs-close").addEventListener("click", () => { $("a2hs").hidden = true; state.a2hs = "dismissed"; });
+}
+showA2hsGuide();
 
 async function main() {
   await loaderReady;
