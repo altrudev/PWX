@@ -20,7 +20,8 @@ for (const d of [L, join(L, "lib"), join(L, "packages"), join(L, "fonts"), A, jo
 const cp = (from, to) => copyFileSync(join(ROOT, from), to);
 
 // ---------- loader host ----------
-for (const f of ["index.html", "how-it-works.html", "loader.mjs", "loader.css", "store.mjs", "config.mjs", "sw.js", "fonts/syne.woff2", "fonts/dm-sans.woff2"]) cp(`loader/${f}`, join(L, f));
+for (const f of ["index.html", "how-it-works.html", "loader.mjs", "loader.css", "store.mjs", "config.mjs", "sw.js", "fonts/syne.woff2", "fonts/dm-sans.woff2",
+  "favicon.svg", "favicon-32.png", "icon-192.png", "icon-512.png", "apple-touch-icon.png"]) cp(`loader/${f}`, join(L, f));
 cp("lib/pwx-verify.mjs", join(L, "lib/pwx-verify.mjs"));
 cp("local/release.json", join(L, "loader-release.json"));
 for (const p of ["notes"]) cp(`packages/${p}.pwx.json`, join(L, "packages", `${p}.pwx.json`));

@@ -21,7 +21,7 @@ const PORT = Number(process.env.PWX_PORT ?? 7100);
 const HOSTNAME = "127.0.0.1";
 const LOADER = `http://${HOSTNAME}:${PORT}`;
 const TYPES = { ".woff2": "font/woff2", ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript",
-  ".css": "text/css", ".json": "application/json" };
+  ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 
 const { canonicalize, sha256, strictParse, b64 } = await import(join(BUNDLE, "lib/pwx-verify.mjs"));
 
@@ -98,7 +98,9 @@ async function serve() {
 
   const LOADER_FILES = { "/": "loader/index.html", "/loader.mjs": "loader/loader.mjs", "/loader.css": "loader/loader.css",
     "/store.mjs": "loader/store.mjs", "/config.mjs": "loader/config.mjs", "/lib/pwx-verify.mjs": "lib/pwx-verify.mjs",
-    "/how-it-works.html": "loader/how-it-works.html", "/fonts/syne.woff2": "loader/fonts/syne.woff2", "/fonts/dm-sans.woff2": "loader/fonts/dm-sans.woff2" };
+    "/how-it-works.html": "loader/how-it-works.html", "/fonts/syne.woff2": "loader/fonts/syne.woff2", "/fonts/dm-sans.woff2": "loader/fonts/dm-sans.woff2",
+    "/favicon.svg": "loader/favicon.svg", "/favicon-32.png": "loader/favicon-32.png", "/icon-192.png": "loader/icon-192.png",
+    "/icon-512.png": "loader/icon-512.png", "/apple-touch-icon.png": "loader/apple-touch-icon.png" };
   http.createServer((req, res) => {
     if (!hostOk(req, PORT)) return send(res, 421, "wrong host");
     const u = new URL(req.url, LOADER);
