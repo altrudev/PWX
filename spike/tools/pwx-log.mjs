@@ -1,100 +1,108 @@
 #!/usr/bin/env node
-// Runs a PWX log as a folder of static files that any web host can serve, and a witness for it.
-//   node tools/pwx-log.mjs init    <dir> <origin>             new log (key in $PWX_KEYS/log-key.json)
-//   node tools/pwx-log.mjs append  <dir> <origin> <entry.json> add a signed entry { entry, sig }
-//   node tools/pwx-log.mjs witness <dir|url> <origin> <name> <state.json>
-//                                       co-sign the current checkpoint if it extends the last one
-//                                       this witness saw (key in $PWX_KEYS/witness-<name>.json);
-//                                       prints the co-signature line
-//   node tools/pwx-log.mjs cosign   <dir> <line-file>...       add witnesses' lines to the checkpoint
-//   node tools/pwx-log.mjs trust    <dir> <origin> <witness names...>
-//                                       the trust settings a loader needs (verifier keys, quorum)
-// The log writes only static files; the witness reads them over HTTP like any client, and builds
-// the consistency proof from the tiles itself, so it needs nothing from the log operator.
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+// Runs a PWX log as a folder of static files that any web host can serve.
+//   node tools/pwx-log.mjs init     <dir> <origin>                 new log (key: $PWX_KEYS/log-key.json)
+//   node tools/pwx-log.mjs append   <dir> <origin> <entries.json>  add signed entries [{ entry, sig }]
+//   node tools/pwx-log.mjs release  <dir> <origin> <pkg.pwx.json> <publisher-key.json>
+//                                       log a package's release, signed by its publisher key
+//                                       (does nothing if that exact release is already logged)
+//   node tools/pwx-log.mjs publish  <dir> <origin> <witness-url>...
+//                                       get each witness to co-sign the current checkpoint
+//                                       (c2sp.org/tlog-witness) and write the co-signatures in
+//   node tools/pwx-log.mjs receipt  <dir> <trust.json> <pkg.pwx.json> [out]
+//                                       add the log receipt to a package (needs a witnessed checkpoint)
+//   node tools/pwx-log.mjs trust    <origin> <witness name>=<witness key file>...
+//                                       the settings a loader pins (keys, quorum)
+// Each witness's last co-signed size is kept next to the folder, in <dir>.witnesses.json (not served).
+import { readFile, writeFile, rename } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
-import { b64, strictParse } from "../lib/pwx-verify.mjs";
-import * as M from "../log/merkle.mjs";
-import * as N from "../log/note.mjs";
+import { canonicalize, sha256, strictParse } from "../lib/pwx-verify.mjs";
+import * as N from "../lib/pwx-note.mjs";
+import { checkReceipt } from "../lib/pwx-receipt.mjs";
 import { TileReader } from "../log/tiles.mjs";
-import { Log, verifySig, newEd25519Jwk, keyFromJwk } from "../log/log.mjs";
-import { loadLog, writeFiles, fromDir, fromUrl, readCheckpoint } from "../log/static.mjs";
+import { Log, signEntry, keyFromJwk, receipt } from "../log/log.mjs";
+import { loadLog, writeFiles, fromDir, readCheckpoint } from "../log/static.mjs";
+import { logKey } from "../log/devlog.mjs";
+import { requestCosignature } from "../log/witness-service.mjs";
 
-const KEYS = process.env.PWX_KEYS ?? join(homedir(), ".config/pwx-dev");
-async function key(file) {
-  const path = join(KEYS, file);
-  if (!existsSync(path)) {
-    await mkdir(KEYS, { recursive: true, mode: 0o700 });
-    await writeFile(path, JSON.stringify(await newEd25519Jwk()), { mode: 0o600 });
-  }
-  return keyFromJwk(JSON.parse(await readFile(path, "utf8")));
-}
-const logKey = () => key("log-key.json");
-const witnessKey = (name) => key(`witness-${name.replace(/[^A-Za-z0-9.-]/g, "_")}.json`);
-
-async function publish(dir, log) {
-  await writeFiles(dir, await log.files(await log.checkpoint()));
-  return log.leaves.length;
-}
+const te = new TextEncoder();
+const publishFiles = async (dir, log) => { await writeFiles(dir, await log.files(await log.checkpoint())); return log.leaves.length; };
+const writeAtomic = async (path, text) => { await writeFile(path + ".tmp", text); await rename(path + ".tmp", path); };
 
 const [cmd, ...a] = process.argv.slice(2);
 try {
   if (cmd === "init") {
     const [dir, origin] = a;
     if (existsSync(join(dir, "checkpoint"))) throw new Error("a log already exists there");
-    console.log(`log ${origin}: size ${await publish(dir, new Log(origin, await logKey()))}`);
+    console.log(`log ${origin}: size ${await publishFiles(dir, new Log(origin, await logKey()))}`);
   } else if (cmd === "append") {
     const [dir, origin, file] = a;
-    const log = await loadLog(dir, origin, await logKey());
+    // PWX_LOG_TIME_SHIFT_MS: tests play a dishonest log that backdates or postdates entries.
+    const shift = Number(process.env.PWX_LOG_TIME_SHIFT_MS ?? 0);
+    const log = await loadLog(dir, origin, await logKey(), () => Date.now() + shift);
     for (const signed of [].concat(strictParse(await readFile(file, "utf8")))) await log.append(signed);
-    console.log(`log ${origin}: size ${await publish(dir, log)} (witnesses haven't co-signed this size yet)`);
-  } else if (cmd === "witness") {
-    const [src, origin, name, stateFile] = a;
-    const k = await witnessKey(name), get = /^https?:/.test(src) ? fromUrl(src) : fromDir(src);
-    const state = existsSync(stateFile) ? JSON.parse(await readFile(stateFile, "utf8")) : { last: null, evidence: [] };
-    if (!state.log) {   // first run: pin the log's key from the trust settings handed over out of band
-      state.log = JSON.parse(process.env.PWX_LOG_VKEY ?? "null");
-      if (!state.log) throw new Error("first run needs PWX_LOG_VKEY='{\"name\":...,\"key\":...}'");
+    console.log(`log ${origin}: size ${await publishFiles(dir, log)} (not co-signed yet: run publish)`);
+  } else if (cmd === "release") {
+    const [dir, origin, pkgFile, keyFile] = a;
+    const log = await loadLog(dir, origin, await logKey());
+    const pkg = strictParse(await readFile(pkgFile, "utf8")), m = strictParse(pkg.manifest);
+    const pub = await keyFromJwk(JSON.parse(await readFile(keyFile, "utf8")));
+    if (pub.key !== pkg.sig.key) throw new Error("that key didn't sign this package");
+    const body = { type: "release", author: m.publisher, app: m.id, version: m.version, manifest: await sha256(te.encode(canonicalize(m))) };
+    const have = log.leaves.findIndex((l) => ["type", "author", "app", "version", "manifest"].every((k) => l.entry[k] === body[k]) && l.entry.signer?.key === pub.key);
+    if (have >= 0) { console.log(`${m.id} ${m.version} is already logged (entry ${have})`); process.exit(0); }
+    await log.append(await signEntry(pub, body));
+    console.log(`logged ${m.id} ${m.version}: size ${await publishFiles(dir, log)} (not co-signed yet: run publish)`);
+  } else if (cmd === "publish") {
+    const [dir, origin, ...witnesses] = a;
+    const get = fromDir(dir), lk = await logKey();
+    const cp = await readCheckpoint(get, { name: origin, key: lk.key });
+    const reader = new TileReader(get, cp.size);
+    const sizesFile = dir.replace(/\/+$/, "") + ".witnesses.json";
+    const sizes = existsSync(sizesFile) ? JSON.parse(await readFile(sizesFile, "utf8")) : {};
+    const note = N.joinNote(cp.note.body, cp.note.sigs.filter((s) => s.name === origin).map((s) => s.line));
+    const lines = [];
+    for (const url of witnesses) {
+      try {
+        const { line } = await requestCosignature(url, note, reader, sizes[url] ?? 0);
+        lines.push(line); sizes[url] = cp.size;
+      } catch (e) { console.error(`pwx-log: ${e.message}`); }
     }
-    const cp = await readCheckpoint(get, state.log);
-    if (cp.origin !== origin) throw new Error("checkpoint is for another log");
-    if (state.last) {
-      const reader = new TileReader(get, cp.size);
-      const ok = cp.size >= state.last.size
-        && b64.enc(await reader.root()) === cp.root
-        && await M.verifyConsistency(state.last.size, cp.size, b64.dec(state.last.root), b64.dec(cp.root), await reader.consistencyProof(state.last.size));
-      if (!ok) {
-        state.evidence.push({ seen: state.last, conflicting: cp.text, at: Date.now() });
-        await writeFile(stateFile, JSON.stringify(state, null, 2));
-        throw new Error("refused: this checkpoint doesn't extend the last one this witness co-signed (evidence kept)");
-      }
+    await writeAtomic(sizesFile, JSON.stringify(sizes, null, 2));
+    await writeAtomic(join(dir, "checkpoint"), note + lines.join(""));
+    console.log(`log ${origin}: size ${cp.size}, ${lines.length} of ${witnesses.length} witnesses co-signed`);
+    if (lines.length < witnesses.length) process.exit(1);
+  } else if (cmd === "receipt") {
+    const [dir, trustFile, pkgFile, out = pkgFile] = a;
+    const trust = JSON.parse(await readFile(trustFile, "utf8")), get = fromDir(dir);
+    const text = new TextDecoder().decode(await get("checkpoint"));
+    const cp = await N.verifyCheckpointNote(text, trust);
+    const pkg = strictParse(await readFile(pkgFile, "utf8")), m = strictParse(pkg.manifest);
+    const want = await sha256(te.encode(canonicalize(m)));
+    const reader = new TileReader(get, cp.size);
+    for (let i = cp.size - 1; i >= 0; i--) {
+      const leaf = strictParse(new TextDecoder().decode(await reader.entry(i)));
+      const e = leaf.entry;
+      if (e.type !== "release" || e.app !== m.id || e.version !== m.version || e.manifest !== want || e.signer?.key !== pkg.sig.key) continue;
+      const proof = (await reader.inclusionProof(i)).map((h) => btoa(String.fromCharCode(...h)));
+      const r = { leaf, index: i, proof, checkpoint: text };
+      await checkReceipt(r, m, pkg.sig.key, trust);          // the loader's own check, before writing
+      await writeFile(out, JSON.stringify({ ...pkg, receipt: r }));
+      console.log(`receipt added: ${m.id} ${m.version}, entry ${i} of ${cp.size}, ${cp.cosigned.length} witness(es)`);
+      process.exit(0);
     }
-    const line = await N.cosignLine(cp.note.body, name, k, Math.floor(Date.now() / 1000));
-    state.last = { size: cp.size, root: cp.root };
-    await writeFile(stateFile, JSON.stringify(state, null, 2));
-    process.stdout.write(line);
-  } else if (cmd === "cosign") {
-    const [dir, ...lineFiles] = a;
-    const text = new TextDecoder().decode(await fromDir(dir)("checkpoint"));
-    const note = N.parseNote(text), have = new Set(note.sigs.map((s) => s.line));
-    const add = [];
-    for (const f of lineFiles) for (const l of (await readFile(f, "utf8")).split(/(?<=\n)/)) if (l.trim() && !have.has(l)) add.push(l);
-    N.parseNote(text + add.join(""));   // still a well-formed note
-    await writeFile(join(dir, ".checkpoint.tmp"), text + add.join(""));
-    await (await import("node:fs/promises")).rename(join(dir, ".checkpoint.tmp"), join(dir, "checkpoint"));
-    console.log(`added ${add.length} co-signature line(s)`);
+    throw new Error(`${m.id} ${m.version} isn't in the log at size ${cp.size}`);
   } else if (cmd === "trust") {
-    const [, origin, ...names] = a;
-    const lk = await logKey(), ws = [];
-    for (const n of names) ws.push({ name: n, key: (await witnessKey(n)).key });
-    console.log(JSON.stringify({
-      origin, log: { name: origin, key: lk.key }, witnesses: ws, quorum: Math.min(2, ws.length),
-      vkeys: { log: await N.vkey(origin, N.ED25519, lk.key), witnesses: await Promise.all(ws.map((w) => N.vkey(w.name, N.COSIG_V1, w.key))) },
-    }, null, 2));
+    const [origin, ...ws] = a;
+    const lk = await logKey(), witnesses = [];
+    for (const w of ws) {
+      const [name, file] = w.split("=");
+      witnesses.push({ name, key: (await keyFromJwk(JSON.parse(await readFile(file, "utf8")))).key });
+    }
+    console.log(JSON.stringify({ origin, log: { name: origin, key: lk.key }, witnesses, quorum: witnesses.length,
+      vkeys: { log: await N.vkey(origin, N.ED25519, lk.key), witnesses: await Promise.all(witnesses.map((w) => N.vkey(w.name, N.COSIG_V1, w.key))) } }, null, 2));
   } else {
-    console.error("usage: pwx-log.mjs init|append|witness|cosign|trust ... (see the top of this file)"); process.exit(2);
+    console.error("usage: pwx-log.mjs init|append|release|publish|receipt|trust ... (see the top of this file)"); process.exit(2);
   }
 } catch (err) {
   console.error(`pwx-log: ${err.message}`); process.exit(1);
