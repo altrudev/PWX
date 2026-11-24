@@ -20,10 +20,16 @@ async function verifySig(p, value, sig) {
   } catch { return false; }
 }
 
-// trust: { origin, log: { name, key }, witnesses: [{ name, key }], quorum }
+// trust: { origin, log: { name, key }, witnesses: [{ name, key }], quorum }, or a list of them
+// (the receipt's checkpoint names its log, and only a pinned log with that name is used).
 // Returns { logged: true, loggedAt, witnesses } or throws with a plain reason.
 export async function checkReceipt(receipt, manifest, publisherKey, trust) {
   if (!receipt || typeof receipt !== "object") throw new Error("no receipt");
+  if (Array.isArray(trust)) {
+    const origin = typeof receipt.checkpoint === "string" ? receipt.checkpoint.slice(0, receipt.checkpoint.indexOf("\n")) : "";
+    trust = trust.find((t) => t.origin === origin);
+    if (!trust) throw new Error(`receipt is from a log this loader doesn't know (${origin.slice(0, 80) || "none"})`);
+  }
   if (!trust || !trust.log) throw new Error("this loader has no log to check against");
   const { leaf, index, proof, checkpoint } = receipt;
   let cp;

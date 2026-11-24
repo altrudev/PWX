@@ -67,11 +67,34 @@ receipts without the inclusion proof. Every one made the matching test fail.
 | Receipts: a logged package passes; another app's, version's, contents' or publisher's receipt, a changed proof, time, entry or signature, a missing witness, and a receipt from another log are refused | pass (`receipt.test.mjs`) |
 | Loader in Chromium, Firefox, WebKit: logged package shown as logged at install and launch; no receipt and a wrong receipt shown as not logged, still installed | 6/6 each (`receipt_test.py`) |
 
+## Public log and witness service (2026-11-20)
+
+- **Witness service** (`log/witness-service.mjs`, issue #22): the
+  [tlog-witness](https://c2sp.org/tlog-witness) protocol (`POST /add-checkpoint`; 409 with its
+  size, 404, 403, 422). It saves its state before a co-signature leaves, handles one request at a
+  time, keeps evidence of a rewritten history, and runs the clock check (item 6 below): new
+  entries are read from the log's public tiles and refused if dated backwards, before its last
+  co-signature, or more than 5 minutes ahead of its clock.
+- **Tools:** `tools/pwx-log.mjs publish` (asks witnesses, follows a 409), `release` (logs a
+  package), `receipt` (adds a checked receipt); `tools/install-witness.sh` (systemd user service
+  with its own copy of the code); `tools/deploy-demo.sh` (logs Notes, publishes, deploys).
+- **Live:** the public log `pwx.altru.dev/log` at <https://pwx.altru.dev/log/>, with Notes 1.0.0
+  as entry 0, co-signed by `witness-1.altru.dev` (VPS, 127.0.0.1:8190, not reachable from outside
+  yet). Release 0.4.11 pins it; the live demo shows Notes as "In the public log".
+
+| Test | Result |
+| --- | --- |
+| Two witness services over HTTP co-sign a static log; a wrong old size gets 409 and the log retries; Go verifies the result | pass (`run_static_log.sh`) |
+| Entries backdated by a day, or dated a day ahead: both witnesses refuse | pass |
+| Rewritten history: witnesses refuse (422) and keep evidence; Go refuses the checkpoint | pass |
+| A receipt is checked only against the pinned log it names; same name with another key is refused | pass (`receipt.test.mjs`) |
+| Live demo: Notes logged, receipt checked offline, `/log/checkpoint` served with CORS and the witness's line | 10/10 in Chromium, Firefox and WebKit |
+
 ## Not built yet
 
-1. **Public hosting** of a real log: the format and tool are ready; the dev log isn't served
-   anywhere yet, and receipts come from it.
-2. **Witnesses as separate services,** run by separate people, and finding the first witnesses.
+1. **A second, independent witness:** someone outside ALTRU, or a public witness network. Ours
+   only runs on 127.0.0.1; it needs an HTTPS address to serve other logs.
+2. **Witnesses run by separate people,** and finding them (issue #22).
 3. **Release entries carrying the two-device approvals** from the Signer spike.
 4. **Required mode:** the loader shows receipts (soft mode, 0.4.10) but doesn't refuse
    unlogged releases yet; it also doesn't check key history or revocations.
@@ -81,4 +104,5 @@ receipts without the inclusion proof. Every one made the matching test fail.
    C2SP checkpoint carries no time of its own, so a dishonest log could backdate an entry.
    Witnesses can close this because the tiles are public: before co-signing, read the new
    entries and refuse if any `loggedAt` goes backwards or is ahead of the witness's clock. The
-   witness co-signature time also bounds when an entry existed. Not built.
+   witness co-signature time also bounds when an entry existed. **Built** in the witness service
+   (2026-11-20).

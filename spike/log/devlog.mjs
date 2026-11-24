@@ -22,7 +22,16 @@ export async function fileKey(file) {
   }
   return keyFromJwk(JSON.parse(await readFile(path, "utf8")));
 }
-export const logKey = () => fileKey("log-key.json");
+// The dev log's key, or another log's key file named in $PWX_LOG_KEY (e.g. public-log-key.json).
+export const logKey = () => fileKey(process.env.PWX_LOG_KEY ?? "log-key.json");
+export const PUBLIC = { origin: "pwx.altru.dev/log", url: "https://pwx.altru.dev/log/", keyFile: "public-log-key.json" };
+// The public log's trust: its key, and the witnesses listed in log/public-witnesses.json
+// (their public keys, as each witness's operator hands them over).
+export async function publicTrust() {
+  const lk = await fileKey(PUBLIC.keyFile);
+  const { witnesses, quorum } = JSON.parse(await readFile(new URL("./public-witnesses.json", import.meta.url), "utf8"));
+  return { origin: PUBLIC.origin, log: { name: PUBLIC.origin, key: lk.key }, witnesses, quorum };
+}
 export const witnessKey = (name) => fileKey(`witness-${name.replace(/[^A-Za-z0-9.-]/g, "_")}.json`);
 
 export async function devTrust() {

@@ -2,7 +2,7 @@ import { verifyPackage, buildHeaders, cmpVersion, canonicalize, sha256, strictPa
 import { library } from "/store.mjs";
 import { TEST } from "/config.mjs";
 import { checkReceipt } from "/lib/pwx-receipt.mjs";
-import { LOG_TRUST } from "/log-trust.mjs";
+import { LOG_TRUSTS } from "/log-trust.mjs";
 
 const LOADER = location.origin;
 // Hosted spike: each app gets its own origin from a fixed pool (ports stand in for per-app
@@ -203,7 +203,7 @@ async function fingerprint(publisher) {
 async function logStatus(text, manifest) {
   const pkg = strictParse(text);
   if (!pkg.receipt) return { logged: false, reason: "no receipt" };
-  try { return await checkReceipt(pkg.receipt, manifest, pkg.sig.key, LOG_TRUST); }
+  try { return await checkReceipt(pkg.receipt, manifest, pkg.sig.key, LOG_TRUSTS); }
   catch (err) { return { logged: false, reason: err.message }; }
 }
 const logLine = (s) => s.logged

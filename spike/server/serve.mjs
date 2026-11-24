@@ -31,6 +31,9 @@ const record = (kind, path) => hits.push({ kind, path, at: Date.now() });
 // serves the test config, so it re-signs the release with that file's hash, and its test hooks
 // can play a host that offers newer, older, forged or broken releases, or a changed sw.js.
 const TEST_CONFIG = "export const TEST = true;\n";
+// Test builds also trust the dev log that tools/build-packages.mjs logs the test packages in.
+const { devTrust } = await import("../log/devlog.mjs");
+const testLogTrust = async () => readFileSync(join(ROOT, "loader/log-trust.mjs"), "utf8") + `LOG_TRUSTS.push(${JSON.stringify(await devTrust())});\n`;
 const hostile = { release: "normal", sw: "normal", tamper: false, swNoStore: false };
 async function signRelease(release, forged = false) {
   const keyPath = join(process.env.PWX_KEYS ?? join(homedir(), ".config/pwx-dev"), "release-key.json");
@@ -48,6 +51,7 @@ async function loaderRelease() {
   if (!TEST) return signed;
   const release = structuredClone(JSON.parse(signed).release);
   release.files["loader/config.mjs"] = await sha256(new TextEncoder().encode(TEST_CONFIG));
+  release.files["loader/log-trust.mjs"] = await sha256(new TextEncoder().encode(await testLogTrust()));
   if (hostile.sw === "changed" && hostile.release === "next") release.files["loader/sw.js"] = await sha256(new TextEncoder().encode(swBody()));
   const r = hostile.release;
   if (r === "next" || r === "badfile" || r === "forged") release.version = bump(release.version, r === "next" ? 1 : 2);
@@ -85,6 +89,9 @@ http.createServer((req, res) => {
   if (TEST && hostile.tamper && u.pathname === "/loader.mjs") {
     res.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" });
     return res.end('document.title = "tampered";\n');
+  }
+  if (TEST && u.pathname === "/log-trust.mjs") {
+    return testLogTrust().then((body) => res.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" }).end(body));
   }
   if (u.pathname === "/config.mjs") {
     if (TEST) { res.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" }); return res.end(TEST_CONFIG); }

@@ -32,6 +32,12 @@ with sync_playwright() as p:
     page.wait_for_function("() => window.__pwx && ['consent', 'running', 'rejected'].includes(window.__pwx.phase)", timeout=30000)
     st = page.evaluate("() => window.__pwx")
     check("install asks first, showing the publisher", st["phase"] == "consent" and "Notes" in page.locator("#consent").inner_text(), st["phase"] + " " + str(st.get("error", "")))
+    log = st.get("logStatus") or {}
+    check("Notes is in the public log (receipt checked offline)", log.get("logged") is True and log.get("origin") == "pwx.altru.dev/log"
+          and "In the public log" in page.locator("#consent").inner_text(), str(log)[:150])
+    # The log itself is public: its signed checkpoint is served at /log/checkpoint, readable from any site.
+    cp = page.evaluate("() => fetch('/log/checkpoint', { cache: 'no-store' }).then(async (r) => ({ status: r.status, cors: r.headers.get('access-control-allow-origin'), text: await r.text() }))")
+    check("the public log is served at /log/", cp["status"] == 200 and cp["text"].startswith("pwx.altru.dev/log\n") and "\u2014 witness-1.altru.dev " in cp["text"] and cp["cors"] == "*", str(cp)[:150])
     if st["phase"] == "consent":
         page.click("#install-confirm")
     page.wait_for_function("() => window.__pwx.phase === 'running' || window.__pwx.phase === 'rejected'", timeout=30000)
