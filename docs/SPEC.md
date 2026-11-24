@@ -113,13 +113,21 @@ host can serve it and other people's tools can read it:
 - **Receipt:** `{ leaf, index, proof, checkpoint }`: the logged entry, its inclusion proof, and a
   checkpoint with the log's signature and enough witness co-signatures.
 
-The loader checks a receipt **offline**, at install and at every launch: a checkpoint signed by
-the pinned log key (`loader/log-trust.mjs`) and co-signed by at least `quorum` of the pinned
-witnesses; the entry signed by this package's publisher key, for this app, this version and this
+The loader checks a receipt **offline**, at install and at every launch: a checkpoint from one of
+the pinned logs (`loader/log-trust.mjs`, matched by the checkpoint's origin line), signed by that
+log's key and co-signed by at least `quorum` of its pinned witnesses; the entry signed by this package's publisher key, for this app, this version and this
 exact manifest; and the inclusion proof against the checkpoint's root. **Soft mode:** the result
 is shown on the install screen ("In the public log" or "Not in the public log (reason)"); a
 missing or bad receipt doesn't block the install yet. Key history, revocation and the waiting
 period ([`M4.md`](M4.md) sections 4–5) are not checked by the loader yet.
+
+**The public log** (since 0.4.11): origin `pwx.altru.dev/log`, served at
+<https://pwx.altru.dev/log/> (CORS open, so any site or monitor can read it). Its witness,
+`witness-1.altru.dev`, is run by ALTRU on a different machine from the log's web host; quorum 1
+until independent witnesses join (`spike/log/public-witnesses.json`). Witnesses speak
+[tlog-witness](https://c2sp.org/tlog-witness) (`POST /add-checkpoint`), and PWX's witness also
+reads the new entries from the public tiles and refuses entries dated backwards, before its last
+co-signature, or ahead of its clock.
 
 ## 5. Loader
 

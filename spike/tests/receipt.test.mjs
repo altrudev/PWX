@@ -62,3 +62,12 @@ test("forged receipts are refused", async () => {
   await assert.rejects(checkReceipt(fake, m, p.sig.key, trust), /not witnessed/);
   await assert.rejects(checkReceipt(null, m, p.sig.key, trust), /no receipt/);
 });
+
+test("with several pinned logs, only the log the receipt names is used", async () => {
+  const { p, m } = parts(loggedNotes);
+  const other = { ...trust, origin: "other.log.example", log: { name: "other.log.example", key: (await newKey()).key } };
+  assert.equal((await checkReceipt(p.receipt, m, p.sig.key, [other, trust])).logged, true);
+  await assert.rejects(checkReceipt(p.receipt, m, p.sig.key, [other]), /a log this loader doesn't know/);
+  // Same name, different key: the checkpoint isn't signed by the pinned key.
+  await assert.rejects(checkReceipt(p.receipt, m, p.sig.key, [{ ...trust, log: other.log }]), /not witnessed/);
+});

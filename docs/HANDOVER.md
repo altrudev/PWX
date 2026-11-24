@@ -1,6 +1,6 @@
 # PWX handover
 
-For the next person (or chat) picking up PWX. Last updated 2026-11-18, at spike release **0.4.10**.
+For the next person (or chat) picking up PWX. Last updated 2026-11-20, at spike release **0.4.11**.
 Read [`../README.md`](../README.md) for what PWX is, [`SPEC.md`](SPEC.md) for how it works and
 [`AUDIT.md`](AUDIT.md) for the security record, [`VISION.md`](VISION.md) for where PWX is going,
 [`M4.md`](M4.md) for the approved signing and log design, [`SIGNER-SPIKE.md`](SIGNER-SPIKE.md) for
@@ -33,11 +33,11 @@ them, and what's next.
   engines, and a copied browser profile can't sign. Not built: chip access in `pwx-local` /
   ALTRU OS (the VPS has no TPM). Not used by the loader yet.
 
-**Live demo:** [pwx.altru.dev](https://pwx.altru.dev), release **0.4.9** (since 2026-11-18; live
-demo test 8/8 in all three engines). 0.4.8 added the iPhone Add to Home Screen guide; 0.4.9 makes
-saving to the home screen save only the app, which then opens full screen. The previous site
-(0.4.7) is backed up on WHC as `~/pwx-backup-0.4.7.tgz`. `spike` is at **0.4.10** (log receipts,
-soft mode), **not deployed**: see "Waiting on Altru". Installable since 0.4.5: the library at `/library/`, and each app
+**Live demo:** [pwx.altru.dev](https://pwx.altru.dev), release **0.4.11** (since 2026-11-20; live
+demo test 10/10 in all three engines). It shows Notes as "In the public log": the **public log**
+is served at <https://pwx.altru.dev/log/> (origin `pwx.altru.dev/log`) and co-signed by ALTRU's
+witness `witness-1.altru.dev`. Deploy with `bash tools/deploy-demo.sh`. Earlier sites are backed
+up on WHC as `~/pwx-backup-0.4.7.tgz` and `~/pwx-backup-0.4.9.tgz`. Installable since 0.4.5: the library at `/library/`, and each app
 at its own home address `/app/<id>/`.
 
 ## Where everything lives
@@ -50,6 +50,8 @@ at its own home address `/app/<id>/`.
 | Signing keys | VPS only: `~/.config/pwx-dev/dev-key.json` and `release-key.json` (never in the repo) |
 | Dev log keys | VPS only, same folder: `log-key.json`, `witness-w1.dev.pwx.altru.dev.json`, `witness-w2.dev.pwx.altru.dev.json` (made 2026-11-18; dev only: losing them only invalidates dev receipts) |
 | Dev log files | `spike/devlog/` (written by `build-packages.mjs`, not committed) |
+| Public log | VPS: `~/pwx-log/www` (the master copy; `~/pwx-log/www.witnesses.json` remembers each witness's size); key `~/.config/pwx-dev/public-log-key.json`; served copy on WHC at `~/pwx.altru.dev/log/` |
+| Witness | VPS: systemd user service `pwx-witness` on 127.0.0.1:8190 (`systemctl --user status pwx-witness`); key `~/.config/pwx-witness/witness-1.json`; state and evidence `~/.local/share/pwx-witness/`; its own copy of the code in `~/.local/share/pwx-witness/app` (reinstall with `tools/install-witness.sh`) |
 | Python venv with Playwright and browsers | VPS: `~/PWX/spike/.venv` (gitignored) |
 | Prometheus | nothing PWX-related |
 | Live demo | WHC cPanel (`ssh whc` from the VPS): `~/pwx.altru.dev` (loader, pwx.altru.dev) and `~/pwx-apps.altru.dev` (shared by app1-app4.pwx.altru.dev, one private storage area per app) |
@@ -157,6 +159,7 @@ the loader's address (`app1`-`app4` + its host), so the signed files are the sam
 | #29 | Home screen saves only the app: a running app's page becomes the app's own (address, manifest, icon, name) and shows the app alone (0.4.9) |
 | #30 | 0.4.9 deployed to pwx.altru.dev (live demo test 8/8 in all three engines) |
 | #31 | M4 log in C2SP formats as static files, `tools/pwx-log.mjs`, Go interop check; receipts inside packages, loader soft mode (0.4.10) |
+| #32 | Witness service (tlog-witness, clock check; issue #22); the public log at pwx.altru.dev/log/ with ALTRU's witness; 0.4.11 deployed |
 
 Closed without merging: #24 (icons), which 0.4.5 had already shipped.
 
@@ -164,15 +167,13 @@ Closed without merging: #24 (icons), which 0.4.5 had already shipped.
 
 1. **Delete the merged branches** on GitHub (Claude isn't allowed to): `docs/handover-nov16`,
    `docs/m4-design`, `docs/vision`, `exp/hosted-demo`, `exp/log`, `exp/signer`,
-   `contrib/a2hs-guide`, `docs/cla`, `docs/cla-main`, `fix/app-only-home`, `docs/deploy-049`, `m4/static-log`.
-2. **Decide when to deploy 0.4.10.** The install screen would say Notes is "In the public log",
-   but the dev log isn't served anywhere and its two witnesses are ALTRU's own keys. Either
-   publish the dev log at pwx.altru.dev/log/ first (`tools/pwx-log.mjs` makes the files), or wait
-   for independent witnesses. Claude didn't deploy it for that reason.
+   `contrib/a2hs-guide`, `docs/cla`, `docs/cla-main`, `fix/app-only-home`, `docs/deploy-049`, `m4/static-log`,
+   `m4/witness`.
+2. **Back up the new keys:** `public-log-key.json` (the public log; losing it means starting a new
+   log) and `~/.config/pwx-witness/witness-1.json` (the witness), plus the dev log keys.
 3. **Check 0.4.9 on a real iPhone and Android phone** (deployed 2026-11-18): add Notes to the
    home screen from a running Notes page and confirm the icon is Notes and it opens full screen.
-4. A second copy of the key backup off the phone is still recommended (it now should include the
-   dev log keys too, though losing those only invalidates dev receipts).
+4. A second copy of the key backup off the phone is still recommended.
 
 Done on 2026-11-17: the signing keys are backed up (an encrypted `pwx-keys.asc` on Altru's phone;
 restore with `gpg -d pwx-keys.asc | tar -xz -C ~/.config`), and private vulnerability reporting
@@ -188,30 +189,32 @@ is on.
 
 Decided on 2026-11-16: the vision ([`VISION.md`](VISION.md)), the M4 design with its decisions
 ([`M4.md`](M4.md), end of file), and option 3 for signing keys ([`SIGNER-SPIKE.md`](SIGNER-SPIKE.md)).
-QUARANTINE.md is still awaiting Altru's approval: ask before building any of it.
+QUARANTINE.md: on 2026-11-19 Altru approved a **spike of Part 1 only**, on a branch beside
+today's design, adopted only if it passes every leak, audit and app test in all three engines.
+Parts 2-4 still need approval.
 
-1. **M4 log, next steps** (static C2SP files and soft-mode receipts done 2026-11-18; see
-   LOG-SPIKE.md, "Not built yet"): publish a real log on ALTRU's static hosting; witnesses as
-   separate services run by other people (issue #22; `tools/pwx-log.mjs witness` already reads a
-   log over HTTP), with the clock check described in LOG-SPIKE.md item 6; the Signer's two-device
-   approvals in release entries; the loader checking key history and revocations, then required
-   mode; revocation list download.
-2. **Hardware keys:** a small native helper for `pwx-local` (TPM on Windows/Linux, Secure Enclave
+1. **M4, next steps** (public log, witness service and soft-mode receipts done; see LOG-SPIKE.md,
+   "Not built yet"): the loader checking key history and revocations (it would keep a verified
+   copy of the log, refreshed about once a day, so it never reveals which apps it has); the
+   Signer's two-device approvals in release entries; a second, independent witness, and an HTTPS
+   address for ours; then required mode.
+2. **QUARANTINE.md Part 1 spike** (approved 2026-11-19, see above).
+3. **Hardware keys:** a small native helper for `pwx-local` (TPM on Windows/Linux, Secure Enclave
    on macOS) and ALTRU OS (Android Keystore), signing ECDSA P-256 approvals in the Signer spike's
    format. Must be tested on real machines (Prometheus, a Mac, an Android phone), not the VPS.
-3. **PWX Signer app:** turn the spike into the real screen: pairing by QR code, approval card,
+4. **PWX Signer app:** turn the spike into the real screen: pairing by QR code, approval card,
    alerts from the log, one-tap revoke. Simple on the surface.
-4. **Then wire it in:** loaders require two-device approvals and a log receipt (soft mode first,
+5. **Then wire it in:** loaders require two-device approvals and a log receipt (soft mode first,
    then required), as in M4.md's rollout.
-5. **QUARANTINE.md**, once Altru decides. Part 1 must keep push, background sync and offline work
+6. **QUARANTINE.md**, once Altru decides. Part 1 must keep push, background sync and offline work
    possible as capabilities of the shell (VISION.md). The Signer would live on the same origin.
-6. **VISION.md design items** after the log: lineage and blessings, licenses and ownership
+7. **VISION.md design items** after the log: lineage and blessings, licenses and ownership
    transfers, earned credentials, the packer web page (issue #21), signed folders (issue #20),
    the self-opening .pwx. (The iPhone install guide is done: 0.4.8.)
-7. **Smaller items:** PWX Guard extension (only if still wanted after QUARANTINE.md); erase
+8. **Smaller items:** PWX Guard extension (only if still wanted after QUARANTINE.md); erase
    confirmation in Firefox and WebKit; binary package format; `storage.persistent`, Standard-app
    storage limits, and the `files`, `clipboard` and `sync` capabilities (validated only).
-8. Merge `spike` into `main` once the M4 log works and the spec is stable.
+9. Merge `spike` into `main` once the M4 log works and the spec is stable.
 
 ## Side thread, not PWX work
 

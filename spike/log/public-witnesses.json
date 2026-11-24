@@ -1,0 +1,5 @@
+{
+  "_note": "Witnesses for the public log pwx.altru.dev/log: name and Ed25519 public key, as each operator hands them over. witness-1 is run by ALTRU on the VPS, separate from the web host that serves the log.",
+  "witnesses": [{ "name": "witness-1.altru.dev", "key": "ghpAWZQXaOz4Fy8842DEk3SQEAzplyfGAr5a5RbxHrY=" }],
+  "quorum": 1
+}
