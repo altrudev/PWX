@@ -118,3 +118,39 @@ sandboxed frames from a local file in each desktop browser.
 2. Part 2 (small once Part 1 is in).
 3. Part 3 spike (PRF support decides the design).
 4. Part 4 alongside the M4 transparency log.
+
+## Part 1 probe results (2026-11-24, branch `q/part1`)
+
+Probe: `spike/tests/q1/` (`server.mjs`, `probe.js`, `frame.js`, `run.py`). The loader-like page
+creates a sandboxed frame (`sandbox="allow-scripts"`, no `allow-same-origin`) and reports what the
+frame and a `data:` worker inside it can reach. A canary records HTTP, WebSocket, TCP and STUN.
+
+| Check | Chromium 159 | Firefox 159 | WebKit 27.2 |
+| --- | --- | --- | --- |
+| Frame origin is opaque (`null`) | yes | yes | yes |
+| localStorage, IndexedDB, CacheStorage, cookies, parent DOM | all blocked | all blocked | all blocked (cookie write is a no-op) |
+| `data:` worker starts in the frame | yes | yes | yes |
+| `RTCPeerConnection` in that worker | absent | absent | absent |
+| HTTP/WebSocket requests reaching the canary (fetch, img, script, beacon, EventSource, prefetch, iframe, popup, WebSocket, importScripts) | 0 | 0 | 0 |
+| Works offline: runtime code in `srcdoc` from the loader origin | no | no | no |
+| Works offline: runtime code inline, its sha256 pinned in the loader CSP and the frame's meta CSP | **yes** | **yes** | **yes** |
+| `blob:` frame instead of `srcdoc` | works | works | no report |
+
+Findings:
+
+- **Sealed frames aren't controlled by the loader's service worker** in any engine, so an
+  external script can't be served offline. Inline the runtime and pin its hash in the loader's
+  CSP (`script-src 'self' 'sha256-…'`). The loader page's CSP is served by the signed loader
+  release, so the pinned hash is covered by the release signature. Use `srcdoc`, not `blob:`.
+- The loader CSP needs `worker-src 'self' data:` so a frame can start the app's `data:` worker
+  (frames inherit the loader's policy as well as their own meta CSP; both must allow a request).
+- **WebKit:** the `data:` worker has a CacheStorage, but it is empty and separate: a cache the
+  loader wrote ("LOADER-SECRET") isn't visible from it.
+- **Known browser limits carry over unchanged:** the frame *document* still has
+  `RTCPeerConnection` (STUN reached the canary in Chromium and WebKit, not Firefox) and WebKit
+  still opens a TCP connection for `link rel=preconnect`. No app code runs in the Strict
+  renderer document; Standard apps keep today's documented WebRTC and preconnect behaviour.
+
+Next: run the Strict renderer in the sealed frame, serve `PwxUI.store` from the loader's storage
+keyed by app id, and rerun the 36-vector leak matrix, the audit and every app test in all three
+engines before adopting anything.
