@@ -35,6 +35,15 @@ if (!lblock.test(lsw)) throw new Error("pin markers not found in loader/sw.js");
 writeFileSync(loaderSw, lsw.replace(lblock, `$1const RELEASE_KEY = ${JSON.stringify(releaseKey)};\n$2`));
 console.log("pinned the release key in loader/sw.js");
 
+// Quarantine Part 1: the sealed runtime's hashes go into the loader page's CSP.
+const { sealedPins } = await import("../lib/pwx-sealed-csp.mjs");
+const sp = sealedPins(join(ROOT, "loader"));
+const lsw2 = readFileSync(loaderSw, "utf8");
+const sblock = /(\/\/ BEGIN PINNED SEALED[^\n]*\n)[\s\S]*?(\/\/ END PINNED SEALED)/;
+if (!sblock.test(lsw2)) throw new Error("sealed pin markers not found in loader/sw.js");
+writeFileSync(loaderSw, lsw2.replace(sblock, `$1const SEALED = ${JSON.stringify(sp)};\n$2`));
+console.log("pinned the sealed runtime in loader/sw.js");
+
 // The public log the loader checks package receipts against (M4). The spike pins its dev log.
 const { publicTrust } = await import("../log/devlog.mjs");
 writeFileSync(join(ROOT, "loader/log-trust.mjs"), `// The public logs this loader checks package receipts against (M4, soft mode).

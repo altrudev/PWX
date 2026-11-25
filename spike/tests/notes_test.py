@@ -50,16 +50,18 @@ def main():
         app.get_by_role("button", name="Delete").click()
         expect(app.locator(".item")).to_have_count(1, timeout=5000)
         check("delete works", app.get_by_role("button", name="Ideas").count() == 1)
-        frame = next(f for f in page.frames if "/__pwx/strict.html" in f.url)
+        # Quarantine Part 1: Notes runs in a sealed frame. No app origin, no storage of its own.
+        frame = next(f for f in page.frames if f.parent_frame == page.main_frame and f.url == "about:srcdoc")
         check("renderer rejected nothing", frame.evaluate("() => (window.__pwxRejected || []).length") == 0)
-        # Audit N1: Remove erases the app's data, so whatever gets this origin next starts empty.
-        origin = page.evaluate("() => window.__pwx.appOrigin")
+        sandbox = page.locator("iframe.app").get_attribute("sandbox") or ""
+        sealed = frame.evaluate("() => { let st = 'readable'; try { localStorage.length; } catch (e) { st = 'blocked'; } return [String(self.origin), st]; }")
+        check("app frame is sealed (opaque origin, no storage, no allow-same-origin)", sealed == ["null", "blocked"] and "allow-same-origin" not in sandbox)
+        check("no app origin used", page.evaluate("() => window.__pwx.appOrigin") == "sealed" and page.locator("iframe.bootstrap").count() == 0)
+        # Audit N1: Remove erases the app's data. Sealed apps keep it on the loader, so the
+        # loader asks. "Keep it" must leave everything in place.
         page.goto(LOADER + "/")
-        # Remove asks on the app's own origin. "Keep it" must leave everything in place.
-        box = page.frame_locator("iframe.bootstrap.confirm")
+        box = page
         page.get_by_role("button", name="Remove Notes", exact=True).click()
-        # Chromium drops clicks on a cross-origin frame that has only just appeared (its own
-        # clickjacking defence), so wait until the box has settled, as a person would.
         expect(box.get_by_role("button", name="Erase this app and its data")).to_be_enabled(timeout=15000)
         box.get_by_role("button", name="Keep it").click(timeout=15000)
         page.wait_for_function("() => window.__pwx.phase === 'remove-cancelled'", timeout=15000)
@@ -76,8 +78,7 @@ def main():
         check("remove takes the app out of the library", gone and "org.example.notes" in page.evaluate("() => window.__pwx.removed || []"))
         page.goto(f"{LOADER}/?pkg=notes")
         expect(app.get_by_text("No notes yet")).to_be_visible(timeout=10000)
-        same = page.evaluate("() => window.__pwx.appOrigin") == origin
-        check("reinstalled on the same origin, no old notes", same and app.locator(".item").count() == 0)
+        check("reinstalled with none of the old notes", app.locator(".item").count() == 0)
         h = hits()
         check("no network contact (canary saw nothing)", not h["hits"] and h["tcp"] == 0)
         version = b.version; b.close()

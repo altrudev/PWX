@@ -12,6 +12,7 @@ import { join, extname, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { canonicalize, sha256, b64 } from "../lib/pwx-verify.mjs";
+import { loaderCsp } from "../lib/pwx-sealed-csp.mjs";
 
 const ROOT = join(fileURLToPath(import.meta.url), "../..");
 const LOADER = "http://127.0.0.1:8100", APP = "http://127.0.0.1:8110";
@@ -82,7 +83,7 @@ http.createServer((req, res) => {
   }
   if (u.pathname === "/__test/served") { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify(served)); }
   served.push(`loader ${u.pathname}`);
-  const csp = `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src ${APP_ORIGINS}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
+  const csp = loaderCsp(join(ROOT, "loader"), APP_ORIGINS);
   if (u.pathname === "/loader-release.json") {
     return loaderRelease().then((body) => res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(body));
   }

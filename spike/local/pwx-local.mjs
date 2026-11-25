@@ -14,6 +14,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, readd
 import { join, dirname, extname, basename } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 
 const BUNDLE = process.env.PWX_BUNDLE ?? join(dirname(fileURLToPath(import.meta.url)), "..");
 const HOME = process.env.PWX_HOME ?? join(homedir(), ".pwx");
@@ -96,11 +97,13 @@ async function serve() {
   Object.values(ports).forEach(ensureApp);
   const appOrigins = () => Object.values(ports).map((p) => `http://${HOSTNAME}:${p}`).join(" ") || "'none'";
 
-  const LOADER_FILES = { "/": "loader/index.html", "/loader.mjs": "loader/loader.mjs", "/loader.css": "loader/loader.css",
+  const LOADER_FILES = { "/": "loader/index.html", "/sealed.mjs": "loader/sealed.mjs", "/sealed-runtime.js": "loader/sealed-runtime.js", "/sealed.css": "loader/sealed.css", "/loader.mjs": "loader/loader.mjs", "/loader.css": "loader/loader.css",
     "/store.mjs": "loader/store.mjs", "/config.mjs": "loader/config.mjs", "/lib/pwx-verify.mjs": "lib/pwx-verify.mjs",
   "/lib/pwx-receipt.mjs": "lib/pwx-receipt.mjs", "/lib/pwx-merkle.mjs": "lib/pwx-merkle.mjs", "/lib/pwx-note.mjs": "lib/pwx-note.mjs", "/log-trust.mjs": "loader/log-trust.mjs",
     "/how-it-works.html": "loader/how-it-works.html", "/fonts/syne.woff2": "loader/fonts/syne.woff2", "/fonts/dm-sans.woff2": "loader/fonts/dm-sans.woff2",
     "/manifest.webmanifest": "loader/manifest.webmanifest", "/icons/icon.svg": "loader/icons/icon.svg", "/icons/icon-192.png": "loader/icons/icon-192.png", "/icons/icon-512.png": "loader/icons/icon-512.png", "/icons/maskable-512.png": "loader/icons/maskable-512.png", "/icons/apple-touch-icon.png": "loader/icons/apple-touch-icon.png" };
+  // Sealed runtime pins, from the verified bundle's own files (Quarantine Part 1).
+  const pin = (f) => "'sha256-" + createHash("sha256").update(readFileSync(join(bundle, f))).digest("base64") + "'";
   http.createServer((req, res) => {
     if (!hostOk(req, PORT)) return send(res, 421, "wrong host");
     const u = new URL(req.url, LOADER);
@@ -131,7 +134,7 @@ async function serve() {
     if (!path) return send(res, 404, "not found");
     // The loader page may frame only the app origins this machine has assigned.
     sendFile(res, bundle, path, { "Content-Security-Policy":
-      `default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src ${appOrigins()}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'` });
+      `default-src 'self'; script-src 'self' ${pin("loader/sealed-runtime.js")}; style-src 'self' ${pin("loader/sealed.css")}; worker-src 'self' data:; connect-src 'self'; frame-src ${appOrigins()}; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'` });
   }).listen(PORT, HOSTNAME, () => {
     console.log(`pwx-local ${bundle.version}: verified ${bundle.files.size} files, serving ${LOADER} (loopback only)`);
   });

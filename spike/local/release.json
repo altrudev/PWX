@@ -1,10 +1,11 @@
 {
   "release": {
-    "version": "0.4.11",
+    "version": "0.5.0",
     "files": {
       "lib/pwx-merkle.mjs": "sha256-0ODQIB0X1N9PvzQSWPTpWwGLbHBOjmawidz0mYeSyjM=",
       "lib/pwx-note.mjs": "sha256-meh0TQzwK/vECBEXgIOLCUxmCQd4Dj+qYrapLUiMc3E=",
       "lib/pwx-receipt.mjs": "sha256-MQnGXP2LcSq0LQ7xsVmIbxgFdwFVHWr1j19pozDAdHs=",
+      "lib/pwx-sealed-csp.mjs": "sha256-z9JA/SF0vXKZp27AJsz5y7FsotjNS0vE/SibO8oX0Kc=",
       "lib/pwx-verify.mjs": "sha256-WFTp05j+WTcVZxaSDQOtr+GTpJVqiFY4AU6DVaQH1ao=",
       "loader/config.mjs": "sha256-FH5HOSfUtpjJVm+UNxQxNtkwGGvd7LSqB+aHZPKjWMU=",
       "loader/fonts/dm-sans.woff2": "sha256-ynLSvOqPTap4Pb36LZtGBow844Fo4FkY+4Z6pFO0+JA=",
@@ -17,11 +18,14 @@
       "loader/icons/maskable-512.png": "sha256-qvVTzquIR72JNotLgxyrvIJBuCwhrC1iRdsBK/+agqw=",
       "loader/index.html": "sha256-TDuaGJrDqLCAMyJ6YnmYDclqqXA2dcaR0wyaRlM9Z9o=",
       "loader/loader.css": "sha256-MTJtvy3B82eA9Q56cSnp71ttUIG59sgsYPz8+c6iLuc=",
-      "loader/loader.mjs": "sha256-uIsE8iG18mhZtxs/IUXD7UQgXXeIiW0KwBVBr0lIMAU=",
+      "loader/loader.mjs": "sha256-rwHhCtHUbH4hlTkinmEqAQRIpadVCUMzwmF9eymtR0c=",
       "loader/log-trust.mjs": "sha256-FshgNfKVp8AppHEb98NQS9JUhEnM3vhkngHBIjZNrPo=",
       "loader/manifest.webmanifest": "sha256-mSlGAUxweYaFcMMcUn8nYug/JnBkcowd5saLX8zYRjs=",
+      "loader/sealed-runtime.js": "sha256-EDnulVTvs5KZZkDaHPuklGbUO9ayt0YxQ6BvjzYz2gk=",
+      "loader/sealed.css": "sha256-/9wxoh3Rbz/hn6vsIbMo2pNSo3ZiEoSsmJorsqxlWRw=",
+      "loader/sealed.mjs": "sha256-m1S+wp6OSrAT/u70GpyCGGKiQS3wUMIENqfjOkSzSVg=",
       "loader/store.mjs": "sha256-DllHipesS1CtUbSKG86w2h7IjANw3xqsejvK4a1zMA8=",
-      "loader/sw.js": "sha256-8/NrQ6HdFq2o8iPwjRZvcIsM8EN5uIW4+lOU2cikmRA=",
+      "loader/sw.js": "sha256-lTM622iYvzUarvW2ZfxM7junjhzz22MAYdTmkQ131eM=",
       "app-origin/bootstrap.html": "sha256-BuBZIfowENCCnXHFskrn2aIoytmmHDhWjzFxpCQWYLo=",
       "app-origin/bootstrap.js": "sha256-qtJneMpOtY9izMDrnyEUM8GgdhK1AKN6o6lZTGWRe6U=",
       "app-origin/guard.js": "sha256-T5G742sbqECNwXC5VeaEMRdp6J5JL0nRwNQrr3474YI=",
@@ -34,6 +38,6 @@
   "sig": {
     "alg": "ed25519",
     "key": "YuCRSgEJ89t+8Xn8AOqQcxz2zk+hNMpI1R61VA1OStY=",
-    "sig": "qbEaZUd8osPJDjEXlTPv37DnkyLJTrHosmT4+7dI6QkcRHAG3VG5tJTKWbootdKiwp6JLpHr2ZBLKo9r4BqYDw=="
+    "sig": "G+k/2L+J+ZRyfHW/RsQlhXZPxc0wYpJaifx9prPOSFg+glJ+yY6E7MZRtPtvM6epUJZcfVfDHHQa13diHFPECw=="
   }
 }

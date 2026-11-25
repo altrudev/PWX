@@ -3,6 +3,7 @@ import { library } from "/store.mjs";
 import { TEST } from "/config.mjs";
 import { checkReceipt } from "/lib/pwx-receipt.mjs";
 import { LOG_TRUSTS } from "/log-trust.mjs";
+import { launchSealed, eraseAppData } from "/sealed.mjs";
 
 const LOADER = location.origin;
 // Hosted spike: each app gets its own origin from a fixed pool (ports stand in for per-app
@@ -291,8 +292,11 @@ async function launch(id) {
   if (!record) throw new PwxError("loader", `${id} is not installed`);
   status("Verifying installed package…");
   if (state.locked) throw new PwxError("loader", "this loader is locked");
-  const { manifest } = await verifyPackage(record.text, { allowLoopbackHttp: dev, trustedPublisher: record.publisher });
+  const { manifest, files } = await verifyPackage(record.text, { allowLoopbackHttp: dev, trustedPublisher: record.publisher });
   state.manifest = manifest;
+  // The test-only positive control (dev + unsafe, test builds only) still runs unprotected on an
+  // app origin: a sealed frame always inherits this page's CSP, so it can't be a control.
+  if (manifest.runtime === "strict" && !unsafe) return launchStrictSealed(id, record, manifest, files);
   const headers = buildHeaders(manifest, LOADER);
   state.headers = headers;
   const APP = await appOrigin(manifest.id, record);
@@ -327,6 +331,23 @@ async function launch(id) {
 // "Add to Home Screen" or "Install" saves the app, never the PWX page around it, and the page
 // shows the app alone. The per-app files come from the hosted loader's service worker, so this
 // needs it (pwx-local still links to the app's home address instead).
+// Quarantine Part 1: a Strict app runs in a sealed frame built here from the verified package.
+// No app origin, no app service worker, no bootstrap: its data is kept by this loader, per app.
+async function launchStrictSealed(id, record, manifest, files) {
+  state.appOrigin = "sealed";
+  $("library").hidden = true;
+  state.logStatus = await logStatus(record.text, manifest);
+  showLines(describe(manifest, await fingerprint(manifest.publisher), state.logStatus));
+  status("Running app (sealed: no origin of its own, no network, no popups, no downloads).");
+  const { started } = await launchSealed({ stage: $("stage"), manifest, files, mode: mode || "passive", unsafe,
+    onReport: (r) => state.messages.push(r) });
+  await started;
+  const appName = record.name ?? manifest.name ?? id;
+  await becomeAppPage({ ...record, id }, appName);
+  state.phase = "running";
+  offerAppInstall({ ...record, id }, appName);
+}
+
 async function becomeAppPage(r, name) {
   if (state.local || !("serviceWorker" in navigator) || !/^[a-z0-9][a-z0-9.-]{0,99}$/.test(r.id)) return;
   if (!(await controller())) return; // on a first visit the worker takes over a moment after "ready"
@@ -385,10 +406,37 @@ async function bootstrapCall(APP, msg, ok, failed, { keep = true, visible = fals
   try { await done; } finally { if (!keep) boot.remove(); }
 }
 
+// Sealed apps: the loader keeps their data, so it asks here. Same wording and safeguards as the
+// app-origin box: the button stays off for a moment, and only a real click counts.
+function confirmRemove(r) {
+  return new Promise((resolve, reject) => {
+    const make = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls, textContent: text });
+    const box = make("div", "panel confirm-remove", "");
+    const erase = make("button", "btn btn-danger", "Erase this app and its data");
+    const keep = make("button", "btn", "Keep it");
+    erase.type = keep.type = "button"; erase.disabled = true;
+    box.append(make("p", "confirm-title", `Erase ${r.name ?? r.id} (${r.id}) and all its data from this device?`),
+      make("p", "muted", "This can't be undone."), erase, " ", keep);
+    $("stage").append(box); box.scrollIntoView({ block: "center" });
+    setTimeout(() => { erase.disabled = false; }, 1000);
+    erase.addEventListener("click", (e) => { if (e.isTrusted) { box.remove(); resolve(); } });
+    keep.addEventListener("click", (e) => { if (e.isTrusted) { box.remove(); reject(new PwxError("loader", "remove cancelled")); } });
+  });
+}
+
 // Remove: wipe the app's origin first, then forget the app. If the wipe fails the app stays
 // installed, so its origin is never handed to another app with data still in it.
 async function removeApp(r) {
   if (state.locked) throw new PwxError("loader", "this loader is locked");
+  if (r.runtime === "strict") {
+    status(`To remove ${r.name}, confirm in the box below.`);
+    state.phase = "remove-confirm";
+    await confirmRemove(r);
+    await eraseAppData(r.id);
+    await library.remove(r.id);
+    state.removed = (state.removed ?? []).concat(r.id);
+    return;
+  }
   const APP = await appOrigin(r.id, r);
   // The app's own origin asks the user; this page can't answer for them.
   status(`To remove ${r.name}, confirm in the box below. It comes from the app's own origin, so only you can approve erasing its data.`);
