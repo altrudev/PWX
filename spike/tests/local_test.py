@@ -47,16 +47,16 @@ def main():
             # A new app reloads the loader once (to allow its new origin), so wait for the final page.
             page.wait_for_function("() => window.__pwx && window.__pwx.phase === 'running' && window.__pwx.appOrigin", timeout=20000)
             expect(app.get_by_role("heading", name="Strict runtime")).to_be_visible(timeout=10000)
-            other_origin = page.evaluate("() => window.__pwx.appOrigin")
+            # Quarantine Part 1: Strict apps run sealed, so neither app has an origin of its own, and
+            # the other app's frame can't open any storage at all.
             frame = None
-            for _ in range(50):  # the app frame may still be navigating when the loader reports "running"
-                frame = next((f for f in page.frames if f.url.startswith(other_origin + "/__pwx/strict.html")), None)
+            for _ in range(50):
+                frame = next((f for f in page.frames if f.parent_frame == page.main_frame and f.url == "about:srcdoc"), None)
                 if frame: break
                 time.sleep(0.2)
-            frame.wait_for_load_state()
-            dbs = frame.evaluate("async () => indexedDB.databases ? (await indexedDB.databases()).map(d => d.name) : ['unsupported']")
-            check("each app gets its own origin", notes_origin != other_origin, f"{notes_origin} vs {other_origin}")
-            check("another app can't see Notes' storage", "pwx-notes" not in dbs, f"databases visible: {dbs}")
+            sealed = frame.evaluate("async () => { try { await indexedDB.databases(); return 'readable'; } catch (e) { return 'blocked'; } }")
+            check("each app is sealed, with no origin of its own", notes_origin == "sealed" and page.evaluate("() => window.__pwx.appOrigin") == "sealed")
+            check("another app can't see Notes' storage", sealed == "blocked", f"storage from the other app's frame: {sealed}")
             page.goto(f"{LOADER}/?open=org.example.notes"); page.wait_for_function(settled, timeout=20000)
             expect(app.get_by_role("button", name="Local note")).to_be_visible(timeout=10000)
             check("Notes reopens with its data", True)

@@ -14,6 +14,11 @@ async function readNotes() {
       for (const n of all) if (n && n.title) titles.push(n.title);
     } catch (e) { titles.push("error:" + (e && e.name)); }
   }
+  // Sealed apps (Quarantine Part 1): data is kept by the loader. Ask it for everything, as an app
+  // that declares storage may; the loader must answer with this app's data only.
+  try {
+    if (self.PwxUI && self.PwxUI.store) for (const n of await self.PwxUI.store.all()) if (n && n.title) titles.push(n.title);
+  } catch (e) { titles.push("store-error:" + (e && e.message)); }
   return titles.join("|") || "none";
 }
 const POISONED_RENDERER = `(async () => {
@@ -29,9 +34,12 @@ const say = (text) => { const n = id++; postMessage({ ops: [{ t: "create", id: n
 onmessage = async (e) => {
   if (e.data?.t !== "init") return;
   const stolen = await readNotes();
-  const cache = await caches.open("pwx-runtime-v1");
-  await cache.put("/__pwx/renderer.js", new Response(POISONED_RENDERER, { headers: { "Content-Type": "text/javascript" } }));
-  await cache.put("/__pwx/strict.html", new Response(POISONED_SHELL, { headers: { "Content-Type": "text/html" } }));
+  let poisoned = "POISONED";
+  try {
+    const cache = await caches.open("pwx-runtime-v1");
+    await cache.put("/__pwx/renderer.js", new Response(POISONED_RENDERER, { headers: { "Content-Type": "text/javascript" } }));
+    await cache.put("/__pwx/strict.html", new Response(POISONED_SHELL, { headers: { "Content-Type": "text/html" } }));
+  } catch (e) { poisoned = "no cache: " + (e && e.name); }
   say(`STOLEN: ${stolen}`);
-  say("POISONED");
+  say(poisoned);
 };

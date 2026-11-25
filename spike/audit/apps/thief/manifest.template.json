@@ -6,6 +6,13 @@
   "runtime": "strict",
   "entry": "app/main.js",
   "capabilities": {
-    "network": { "connect": [], "webrtc": "none" }
+    "network": {
+      "connect": [],
+      "webrtc": "none"
+    },
+    "storage": {
+      "local": true,
+      "persistent": false
+    }
   }
 }

@@ -154,3 +154,22 @@ Findings:
 Next: run the Strict renderer in the sealed frame, serve `PwxUI.store` from the loader's storage
 keyed by app id, and rerun the 36-vector leak matrix, the audit and every app test in all three
 engines before adopting anything.
+
+## Part 1, step A built (2026-11-25, branch `q/part1`, release 0.5.0 on the branch only)
+
+Strict apps (Notes) run in a sealed frame; Standard apps still use app origins (step B).
+Full suite in Chromium, Firefox and WebKit: Notes 12/12, Strict leak test (every vector blocked,
+undeclared storage refused), app install, offline, pwx-local 6/6, loader update, a2hs, bootstrap
+trust 9/9, receipts, log, leak matrix unchanged; **audit 0 of 10 exploited** in each engine.
+
+Audit changes for the sealed design (no attack dropped): the bootstrap hijack targets an app
+origin anyway and must find no Notes data there; the thief app now also declares storage and
+asks the loader for everything, and gets only its own (empty) data; the pwx-local CSRF check
+counts a missing origin list as zero, because sealed apps get no origins.
+
+**Trade-off (recorded before anything ships):** with step A alone, Strict app data lives on the
+loader origin. Code running *inside the loader page* (for example an injected script) could read
+it, where today an app origin refuses anything but a genuine package. Against a compromised host
+the two are equal (a host can swap app-origin workers too). Parts 2 and 3 close the gap: a frozen
+kernel makes any worker swap exactly detectable, and encrypted app data leaves a hijacked loader
+only ciphertext. **Decision: don't ship Part 1 without Parts 2 and 3.**

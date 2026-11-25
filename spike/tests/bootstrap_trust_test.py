@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """App origins don't trust the loader.
-Plays a hijacked loader: script running on the loader's own origin frames the Notes origin's
-bootstrap (as the real loader does) and pushes things at it. The app origin must refuse
-everything except a genuine package from Notes' own publisher that isn't older, and Notes and
-its data must be untouched afterwards. Starts and stops its own server.
+Plays a hijacked loader: script running on the loader's own origin frames an app origin's
+bootstrap (as the real loader does for Standard apps) and pushes things at it. The app origin
+must refuse everything except a genuine package from its own app's publisher that isn't older.
+Since Quarantine Part 1 Strict apps (Notes) run sealed with no app origin, so this test installs
+the Notes package on an app origin directly, through that origin's own verification, as a
+sample package. Starts and stops its own server.
 Usage: .venv/bin/python tests/bootstrap_trust_test.py --browser chromium|firefox|webkit"""
 import argparse, json, os, subprocess, sys, time
 from pathlib import Path
@@ -40,17 +42,14 @@ def main():
     try:
         with sync_playwright() as p:
             b = getattr(p, a.browser).launch(); version = b.version
-            ctx = b.new_context(); page = ctx.new_page(); app = page.frame_locator("iframe.app")
-            page.goto(f"{LOADER}/?pkg=notes")
-            app.get_by_role("button", name="New note").click(timeout=20000)
-            app.get_by_label("Title", exact=True).fill("Keep me")
-            expect(app.get_by_text("Saved on this device")).to_be_visible(timeout=5000)
-            origin = page.evaluate("() => window.__pwx.appOrigin")
-            check("Notes installed through the app origin's own verification", True, origin)
-
+            ctx = b.new_context(); page = ctx.new_page()
+            origin = "http://127.0.0.1:8110"
             page.goto(LOADER + "/")
             page.wait_for_function("() => window.__pwx && window.__pwx.phase === 'library'", timeout=20000)
             def push(msg): return page.evaluate(PUSH, [origin, msg])
+            genuine = (ROOT / "packages" / "notes.pwx.json").read_text()
+            r = push({"type": "install", "text": genuine})
+            check("genuine package installed through the app origin's own verification", r.get("type") == "installed", str(r)[:90])
             evil_js = "self.postMessage({ops:[]}); // hijacked"
             attacks = [
                 ("raw files and headers (the old protocol)", {"type": "install", "files": {"app/main.js": evil_js}, "headers": {}}, "signed package"),
@@ -68,15 +67,6 @@ def main():
             r = push({"type": "wipe"})
             check("wipe request without the user's click erases nothing", r.get("type") == "timeout", str(r)[:90])
 
-            page.goto(f"{LOADER}/?open=org.example.notes")
-            try:
-                expect(app.get_by_role("button", name="Keep me")).to_be_visible(timeout=20000); intact = True
-            except AssertionError:
-                intact = False
-            check("Notes and its data untouched after the attacks", intact)
-
-            page.goto(LOADER + "/")
-            page.wait_for_function("() => window.__pwx && window.__pwx.phase === 'library'", timeout=20000)
             r = push({"type": "install", "text": pk["newer"]})
             check("accepted: newer genuine version from the same publisher", r.get("type") == "installed", str(r)[:90])
             b.close()

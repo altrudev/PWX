@@ -103,7 +103,7 @@ async function serve() {
     "/how-it-works.html": "loader/how-it-works.html", "/fonts/syne.woff2": "loader/fonts/syne.woff2", "/fonts/dm-sans.woff2": "loader/fonts/dm-sans.woff2",
     "/manifest.webmanifest": "loader/manifest.webmanifest", "/icons/icon.svg": "loader/icons/icon.svg", "/icons/icon-192.png": "loader/icons/icon-192.png", "/icons/icon-512.png": "loader/icons/icon-512.png", "/icons/maskable-512.png": "loader/icons/maskable-512.png", "/icons/apple-touch-icon.png": "loader/icons/apple-touch-icon.png" };
   // Sealed runtime pins, from the verified bundle's own files (Quarantine Part 1).
-  const pin = (f) => "'sha256-" + createHash("sha256").update(readFileSync(join(bundle, f))).digest("base64") + "'";
+  const pin = (f) => "'sha256-" + createHash("sha256").update(bundle.files.get(f)).digest("base64") + "'";
   http.createServer((req, res) => {
     if (!hostOk(req, PORT)) return send(res, 421, "wrong host");
     const u = new URL(req.url, LOADER);
