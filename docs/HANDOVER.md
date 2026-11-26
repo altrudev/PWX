@@ -106,6 +106,8 @@ the loader's address (`app1`-`app4` + its host), so the signed files are the sam
 
 - Work on a branch, open a PR into `spike` (or `main` for overview docs), and wait for the
   `audit` CI check (safeaudit) to pass before merging.
+- **No attribution footers** in commits, PRs, issues or messages (no "Generated with Claude Code",
+  session links, `Co-Authored-By: Claude` or `Claude-Session:` lines). See `CLAUDE.md`.
 - Commits made on the VPS use the identity `Altru.dev`
   `<266135212+altrudev@users.noreply.github.com>`.
 - The VPS can push to GitHub. Claude can't force-push or delete branches (refused every time),
