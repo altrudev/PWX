@@ -4,6 +4,7 @@
 # 1. Logs the Notes release in the public log (~/pwx-log/www; a no-op if already logged).
 # 2. Uploads the log to https://pwx.altru.dev/log/, then asks the witness to co-sign it: the
 #    witness reads the new entries from that public address for its clock check.
+#    Then writes the release status list (withdrawals and revocations) and uploads it with the log.
 # 3. Adds the public-log receipt to Notes, builds the site (log included) and uploads it.
 # 4. Runs the live demo test in all three engines.
 set -euo pipefail
@@ -17,6 +18,9 @@ rsync -a --exclude='.*' "$LOG/" whc:pwx.altru.dev/log/
 node tools/pwx-log.mjs publish "$LOG" "$ORIGIN" "$WITNESS"
 rsync -a --exclude='.*' "$LOG/" whc:pwx.altru.dev/log/
 node --input-type=module -e "import { publicTrust } from './log/devlog.mjs'; console.log(JSON.stringify(await publicTrust()))" > /tmp/pwx-public-trust.json
+# The release status list loaders download whole (M4 5a): withdrawals and revocations, with proofs.
+node tools/pwx-log.mjs status "$LOG" /tmp/pwx-public-trust.json
+rsync -a --exclude='.*' "$LOG/" whc:pwx.altru.dev/log/
 rm -rf /tmp/pwx-pkgs && mkdir -p /tmp/pwx-pkgs
 node tools/pwx-log.mjs receipt "$LOG" /tmp/pwx-public-trust.json packages/notes.pwx.json /tmp/pwx-pkgs/notes.pwx.json
 rm -rf /tmp/pwx-site

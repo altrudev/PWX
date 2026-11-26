@@ -35,6 +35,8 @@ const TEST_CONFIG = "export const TEST = true;\n";
 const { devTrust } = await import("../log/devlog.mjs");
 const testLogTrust = async () => readFileSync(join(ROOT, "loader/log-trust.mjs"), "utf8") + `LOG_TRUSTS.push(${JSON.stringify(await devTrust())});\n`;
 const hostile = { release: "normal", sw: "normal", tamper: false, swNoStore: false };
+// Each test server starts with no release status list; tests/release_status_test.py writes one.
+if (TEST) { try { (await import("node:fs")).rmSync(process.env.PWX_TEST_STATUS ?? "/tmp/pwx-test-status.json", { force: true }); } catch {} }
 async function signRelease(release, forged = false) {
   const keyPath = join(process.env.PWX_KEYS ?? join(homedir(), ".config/pwx-dev"), "release-key.json");
   const jwk = JSON.parse(readFileSync(keyPath, "utf8"));
@@ -89,6 +91,12 @@ http.createServer((req, res) => {
   if (TEST && hostile.tamper && u.pathname === "/loader.mjs") {
     res.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" });
     return res.end('document.title = "tampered";\n');
+  }
+  // Release status list (M4 5a). Test builds serve the file a test wrote; it's absent otherwise.
+  if (u.pathname === "/log/status.json") {
+    const f = process.env.PWX_TEST_STATUS ?? "/tmp/pwx-test-status.json";
+    if (!TEST || !existsSync(f)) return res.writeHead(404).end();
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }); return res.end(readFileSync(f));
   }
   if (TEST && u.pathname === "/log-trust.mjs") {
     return testLogTrust().then((body) => res.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" }).end(body));

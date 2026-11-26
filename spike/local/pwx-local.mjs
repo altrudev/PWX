@@ -98,7 +98,7 @@ async function serve() {
 
   const LOADER_FILES = { "/": "loader/index.html", "/loader.mjs": "loader/loader.mjs", "/loader.css": "loader/loader.css",
     "/store.mjs": "loader/store.mjs", "/config.mjs": "loader/config.mjs", "/lib/pwx-verify.mjs": "lib/pwx-verify.mjs",
-  "/lib/pwx-receipt.mjs": "lib/pwx-receipt.mjs", "/lib/pwx-merkle.mjs": "lib/pwx-merkle.mjs", "/lib/pwx-note.mjs": "lib/pwx-note.mjs", "/log-trust.mjs": "loader/log-trust.mjs",
+  "/lib/pwx-receipt.mjs": "lib/pwx-receipt.mjs", "/lib/pwx-status.mjs": "lib/pwx-status.mjs", "/lib/pwx-merkle.mjs": "lib/pwx-merkle.mjs", "/lib/pwx-note.mjs": "lib/pwx-note.mjs", "/log-trust.mjs": "loader/log-trust.mjs",
     "/how-it-works.html": "loader/how-it-works.html", "/fonts/syne.woff2": "loader/fonts/syne.woff2", "/fonts/dm-sans.woff2": "loader/fonts/dm-sans.woff2",
     "/manifest.webmanifest": "loader/manifest.webmanifest", "/icons/icon.svg": "loader/icons/icon.svg", "/icons/icon-192.png": "loader/icons/icon-192.png", "/icons/icon-512.png": "loader/icons/icon-512.png", "/icons/maskable-512.png": "loader/icons/maskable-512.png", "/icons/apple-touch-icon.png": "loader/icons/apple-touch-icon.png" };
   http.createServer((req, res) => {
