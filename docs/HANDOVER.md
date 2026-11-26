@@ -106,11 +106,11 @@ the loader's address (`app1`-`app4` + its host), so the signed files are the sam
 
 - Work on a branch, open a PR into `spike` (or `main` for overview docs), and wait for the
   `audit` CI check (safeaudit) to pass before merging.
-- **No attribution footers** in commits, PRs, issues or messages (no "Generated with Claude Code",
-  session links, `Co-Authored-By: Claude` or `Claude-Session:` lines). See `CLAUDE.md`.
+- **No attribution footers** in commits, PRs, issues or messages: no "Generated with ..." lines,
+  links to AI chat sessions, or trailers naming an AI assistant. See `AGENTS.md`.
 - Commits made on the VPS use the identity `Altru.dev`
   `<266135212+altrudev@users.noreply.github.com>`.
-- The VPS can push to GitHub. Claude can't force-push or delete branches (refused every time),
+- The VPS can push to GitHub. AI sessions can't force-push or delete branches (refused every time),
   so add new commits rather than rewriting history, and leave branch deletion to Altru.
 - **Contributor License Agreement (since 2026-11-18):** outside contributors must accept
   [`CLA.md`](../CLA.md) by ticking the box in the pull request template; the
@@ -168,7 +168,7 @@ Closed without merging: #24 (icons), which 0.4.5 had already shipped.
 
 ## Waiting on Altru
 
-1. **Delete the merged branches** on GitHub (Claude isn't allowed to): `docs/handover-nov16`,
+1. **Delete the merged branches** on GitHub (AI sessions aren't allowed to): `docs/handover-nov16`,
    `docs/m4-design`, `docs/vision`, `exp/hosted-demo`, `exp/log`, `exp/signer`,
    `contrib/a2hs-guide`, `docs/cla`, `docs/cla-main`, `fix/app-only-home`, `docs/deploy-049`, `m4/static-log`,
    `m4/witness`.
