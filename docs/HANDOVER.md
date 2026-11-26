@@ -1,10 +1,10 @@
 # PWX handover
 
-For the next person (or chat) picking up PWX. Last updated 2026-11-26, at spike release **0.4.12**.
+For the next person (or chat) picking up PWX. Last updated 2026-11-26, at spike release **0.4.12** (the Quarantine branch `q/part1` is at 0.5.0).
 Read [`../README.md`](../README.md) for what PWX is, [`SPEC.md`](SPEC.md) for how it works and
 [`AUDIT.md`](AUDIT.md) for the security record, [`VISION.md`](VISION.md) for where PWX is going,
 [`M4.md`](M4.md) for the approved signing and log design, [`SIGNER-SPIKE.md`](SIGNER-SPIKE.md) for
-its first spike, and [`QUARANTINE.md`](QUARANTINE.md) for the proposal still awaiting a decision. This file covers where things are, how to work on
+its first spike, and [`QUARANTINE.md`](QUARANTINE.md) for the Quarantine work (its results so far are on branch `q/part1`). This file covers where things are, how to work on
 them, and what's next.
 
 ## Where things stand
@@ -192,32 +192,37 @@ is on.
 
 Decided on 2026-11-16: the vision ([`VISION.md`](VISION.md)), the M4 design with its decisions
 ([`M4.md`](M4.md), end of file), and option 3 for signing keys ([`SIGNER-SPIKE.md`](SIGNER-SPIKE.md)).
-QUARANTINE.md: on 2026-11-19 Altru approved a **spike of Part 1 only**, on a branch beside
-today's design, adopted only if it passes every leak, audit and app test in all three engines.
-Parts 2-4 still need approval.
+QUARANTINE.md: on 2026-11-19 Altru approved a spike of Part 1; on 2026-11-26 Altru approved
+**Parts 2 and 3** too, with **unlock by the device's own unlock (passkey with the WebAuthn PRF
+extension: fingerprint, face or PIN) where the browser supports it, and a passphrase as backup**.
+Part 4 still needs approval. Part 1 step A is built on branch `q/part1` (release 0.5.0, branch
+only; every suite and the audit pass): Strict apps run in a sealed frame and their data lives on
+the loader's origin. Rule recorded there: **don't ship Part 1 without Parts 2 and 3.**
 
-1. **M4, next steps** (public log, witness service and soft-mode receipts done; see LOG-SPIKE.md,
-   "Not built yet"): the loader checking key history and revocations (it would keep a verified
-   copy of the log, refreshed about once a day, so it never reveals which apps it has); the
-   Signer's two-device approvals in release entries; a second, independent witness, and an HTTPS
-   address for ours; then required mode.
-2. **QUARANTINE.md Part 1 spike** (approved 2026-11-19, see above).
+1. **Quarantine, on `q/part1`, shipped together as one release:**
+   - bring `q/part1` up to date with `spike` (0.4.11 public log, 0.4.12 release status);
+   - **Part 2, frozen kernel:** the loader's `sw.js` never changes; the file list and headers move
+     into the signed release, so any new worker is an attack and the page locks at once;
+   - **Step B:** Standard apps sealed too (app origins remain only where a sealed frame can't work);
+   - **Part 3, data locked at rest:** app data encrypted with a key unlocked by the device unlock
+     or a passphrase, held only in the page's memory;
+   - then the full suite, leak matrix and audit in all three engines, merge, deploy.
+2. **M4, next steps:** the loader checking key history (withdrawn and revoked releases are done in
+   0.4.12); the Signer's two-device approvals in release entries; a second, independent witness
+   and an HTTPS address for ours; then required mode. Part 4 (a verifying gateway) goes with this.
 3. **Hardware keys:** a small native helper for `pwx-local` (TPM on Windows/Linux, Secure Enclave
    on macOS) and ALTRU OS (Android Keystore), signing ECDSA P-256 approvals in the Signer spike's
    format. Must be tested on real machines (Prometheus, a Mac, an Android phone), not the VPS.
 4. **PWX Signer app:** turn the spike into the real screen: pairing by QR code, approval card,
-   alerts from the log, one-tap revoke. Simple on the surface.
-5. **Then wire it in:** loaders require two-device approvals and a log receipt (soft mode first,
-   then required), as in M4.md's rollout.
-6. **QUARANTINE.md**, once Altru decides. Part 1 must keep push, background sync and offline work
-   possible as capabilities of the shell (VISION.md). The Signer would live on the same origin.
-7. **VISION.md design items** after the log: lineage and blessings, licenses and ownership
-   transfers, earned credentials, the packer web page (issue #21), signed folders (issue #20),
-   the self-opening .pwx. (The iPhone install guide is done: 0.4.8.)
-8. **Smaller items:** PWX Guard extension (only if still wanted after QUARANTINE.md); erase
-   confirmation in Firefox and WebKit; binary package format; `storage.persistent`, Standard-app
-   storage limits, and the `files`, `clipboard` and `sync` capabilities (validated only).
-9. Merge `spike` into `main` once the M4 log works and the spec is stable.
+   alerts from the log, one-tap revoke. Then loaders require two-device approvals and a log
+   receipt (soft mode first, then required), as in M4.md's rollout.
+5. **VISION.md design items:** lineage and blessings, licenses and ownership transfers, earned
+   credentials, the packer web page (issue #21), signed folders (issue #20), the self-opening
+   .pwx; a second Strict demo app (issue #18).
+6. **Smaller items:** PWX Guard extension (likely not needed after Quarantine); erase
+   confirmation in Firefox and WebKit; binary package format; `storage.persistent`,
+   Standard-app storage limits, and the `files`, `clipboard` and `sync` capabilities (validated only).
+7. Merge `spike` into `main` once the M4 log works and the spec is stable.
 
 ## Side thread, not PWX work
 
