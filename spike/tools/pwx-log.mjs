@@ -5,6 +5,12 @@
 //   node tools/pwx-log.mjs release  <dir> <origin> <pkg.pwx.json> <publisher-key.json>
 //                                       log a package's release, signed by its publisher key
 //                                       (does nothing if that exact release is already logged)
+//   node tools/pwx-log.mjs withdraw <dir> <origin> <pkg.pwx.json> <publisher-key.json> withdrawn|revoked [message] [replacement]
+//                                       log that a release is withdrawn (bug, replaced) or revoked (unsafe),
+//                                       signed by its publisher key (M4 section 5a); then run publish and status
+//   node tools/pwx-log.mjs status   <dir> <trust.json> [out]
+//                                       write <dir>/status.json: every withdrawal and revocation, each with
+//                                       its inclusion proof against the witnessed checkpoint (loaders download it whole)
 //   node tools/pwx-log.mjs publish  <dir> <origin> <witness-url>...
 //                                       get each witness to co-sign the current checkpoint
 //                                       (c2sp.org/tlog-witness) and write the co-signatures in
@@ -19,6 +25,7 @@ import { join } from "node:path";
 import { canonicalize, sha256, strictParse } from "../lib/pwx-verify.mjs";
 import * as N from "../lib/pwx-note.mjs";
 import { checkReceipt } from "../lib/pwx-receipt.mjs";
+import { checkStatus, REASONS } from "../lib/pwx-status.mjs";
 import { TileReader } from "../log/tiles.mjs";
 import { Log, signEntry, keyFromJwk, receipt } from "../log/log.mjs";
 import { loadLog, writeFiles, fromDir, readCheckpoint } from "../log/static.mjs";
@@ -53,6 +60,34 @@ try {
     if (have >= 0) { console.log(`${m.id} ${m.version} is already logged (entry ${have})`); process.exit(0); }
     await log.append(await signEntry(pub, body));
     console.log(`logged ${m.id} ${m.version}: size ${await publishFiles(dir, log)} (not co-signed yet: run publish)`);
+  } else if (cmd === "withdraw") {
+    const [dir, origin, pkgFile, keyFile, reason, message, replacement] = a;
+    if (!REASONS.has(reason)) throw new Error("reason must be withdrawn or revoked");
+    if (message !== undefined && message.length > 140) throw new Error("message is longer than 140 characters");
+    const log = await loadLog(dir, origin, await logKey());
+    const pkg = strictParse(await readFile(pkgFile, "utf8")), m = strictParse(pkg.manifest);
+    const pub = await keyFromJwk(JSON.parse(await readFile(keyFile, "utf8")));
+    if (pub.key !== pkg.sig.key) throw new Error("that key didn't sign this package");
+    const body = { type: "revoke", reason, author: m.publisher, app: m.id, version: m.version, manifest: await sha256(te.encode(canonicalize(m))),
+      ...(message ? { message } : {}), ...(replacement ? { replacement } : {}) };
+    await log.append(await signEntry(pub, body));
+    console.log(`logged: ${m.id} ${m.version} ${reason}: size ${await publishFiles(dir, log)} (not co-signed yet: run publish, then status)`);
+  } else if (cmd === "status") {
+    const [dir, trustFile, out = join(dir, "status.json")] = a;
+    const trust = JSON.parse(await readFile(trustFile, "utf8")), get = fromDir(dir);
+    const text = new TextDecoder().decode(await get("checkpoint"));
+    const cp = await N.verifyCheckpointNote(text, trust);
+    const reader = new TileReader(get, cp.size), revocations = [];
+    for (let i = 0; i < cp.size; i++) {
+      const leaf = strictParse(new TextDecoder().decode(await reader.entry(i)));
+      if (leaf.entry?.type !== "revoke") continue;
+      revocations.push({ leaf, index: i, proof: (await reader.inclusionProof(i)).map((h) => btoa(String.fromCharCode(...h))) });
+    }
+    const status = { checkpoint: text, revocations };
+    const v = await checkStatus(status, [trust]);                // the loader's own check, before writing
+    if (v.dropped) throw new Error(`${v.dropped} entries failed the loader's check`);
+    await writeAtomic(out, JSON.stringify(status));
+    console.log(`release status: ${v.entries.length} withdrawn or revoked, log size ${cp.size}, written to ${out}`);
   } else if (cmd === "publish") {
     const [dir, origin, ...witnesses] = a;
     const get = fromDir(dir), lk = await logKey();
@@ -102,7 +137,7 @@ try {
     console.log(JSON.stringify({ origin, log: { name: origin, key: lk.key }, witnesses, quorum: witnesses.length,
       vkeys: { log: await N.vkey(origin, N.ED25519, lk.key), witnesses: await Promise.all(witnesses.map((w) => N.vkey(w.name, N.COSIG_V1, w.key))) } }, null, 2));
   } else {
-    console.error("usage: pwx-log.mjs init|append|release|publish|receipt|trust ... (see the top of this file)"); process.exit(2);
+    console.error("usage: pwx-log.mjs init|append|release|withdraw|publish|status|receipt|trust ... (see the top of this file)"); process.exit(2);
   }
 } catch (err) {
   console.error(`pwx-log: ${err.message}`); process.exit(1);
