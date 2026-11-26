@@ -1,6 +1,6 @@
 # PWX handover
 
-For the next person (or chat) picking up PWX. Last updated 2026-11-20, at spike release **0.4.11**.
+For the next person (or chat) picking up PWX. Last updated 2026-11-26, at spike release **0.4.12**.
 Read [`../README.md`](../README.md) for what PWX is, [`SPEC.md`](SPEC.md) for how it works and
 [`AUDIT.md`](AUDIT.md) for the security record, [`VISION.md`](VISION.md) for where PWX is going,
 [`M4.md`](M4.md) for the approved signing and log design, [`SIGNER-SPIKE.md`](SIGNER-SPIKE.md) for
@@ -33,7 +33,7 @@ them, and what's next.
   engines, and a copied browser profile can't sign. Not built: chip access in `pwx-local` /
   ALTRU OS (the VPS has no TPM). Not used by the loader yet.
 
-**Live demo:** [pwx.altru.dev](https://pwx.altru.dev), release **0.4.11** (since 2026-11-20; live
+**Live demo:** [pwx.altru.dev](https://pwx.altru.dev), release **0.4.12** (since 2026-11-26; live
 demo test 10/10 in all three engines). It shows Notes as "In the public log": the **public log**
 is served at <https://pwx.altru.dev/log/> (origin `pwx.altru.dev/log`) and co-signed by ALTRU's
 witness `witness-1.altru.dev`. Deploy with `bash tools/deploy-demo.sh`. Earlier sites are backed
@@ -159,6 +159,7 @@ the loader's address (`app1`-`app4` + its host), so the signed files are the sam
 | #29 | Home screen saves only the app: a running app's page becomes the app's own (address, manifest, icon, name) and shows the app alone (0.4.9) |
 | #30 | 0.4.9 deployed to pwx.altru.dev (live demo test 8/8 in all three engines) |
 | #31 | M4 log in C2SP formats as static files, `tools/pwx-log.mjs`, Go interop check; receipts inside packages, loader soft mode (0.4.10) |
+| #34 | Release status (M4 5a): withdrawn or revoked releases, "last checked" in App facts, the 30-day prompt; the test Jason McGill suggested; 0.4.12 |
 | #32 | Witness service (tlog-witness, clock check; issue #22); the public log at pwx.altru.dev/log/ with ALTRU's witness; 0.4.11 deployed |
 
 Closed without merging: #24 (icons), which 0.4.5 had already shipped.

@@ -55,6 +55,7 @@ receipts without the inclusion proof. Every one made the matching test fail.
   `golang.org/x/mod/sumdb/note` (log signature), `transparency-dev/formats` (witness
   co-signatures) and `golang.org/x/mod/sumdb/tlog` (every tile and every entry's inclusion proof).
 - **Receipts in packages, loader soft mode** (release 0.4.10): see SPEC.md section 4.1.
+- **Release status** (release 0.4.12): withdrawn and revoked releases, the whole-list download, "last checked" and the 30-day prompt; see SPEC.md section 4.0 and `tests/release_status_test.py`.
   `tools/build-packages.mjs` logs every test package in a development log (`log/devlog.mjs`; its
   keys sit with the other dev keys, and its files in `spike/devlog/`, not committed).
 

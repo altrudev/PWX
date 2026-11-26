@@ -22,7 +22,7 @@ const cp = (from, to) => copyFileSync(join(ROOT, from), to);
 // ---------- loader host ----------
 for (const f of ["index.html", "how-it-works.html", "log-trust.mjs", "loader.mjs", "loader.css", "store.mjs", "config.mjs", "sw.js", "fonts/syne.woff2", "fonts/dm-sans.woff2", "manifest.webmanifest",
   "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png"]) cp(`loader/${f}`, join(L, f));
-for (const f of ["pwx-verify.mjs", "pwx-receipt.mjs", "pwx-merkle.mjs", "pwx-note.mjs"]) cp(`lib/${f}`, join(L, "lib", f));
+for (const f of ["pwx-verify.mjs", "pwx-receipt.mjs", "pwx-status.mjs", "pwx-merkle.mjs", "pwx-note.mjs"]) cp(`lib/${f}`, join(L, "lib", f));
 cp("local/release.json", join(L, "loader-release.json"));
 // PWX_SITE_PACKAGES: a folder of packages carrying public-log receipts (tools/deploy-demo.sh).
 const PKGS = process.env.PWX_SITE_PACKAGES ?? join(ROOT, "packages");

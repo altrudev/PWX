@@ -3,6 +3,7 @@ import { library } from "/store.mjs";
 import { TEST } from "/config.mjs";
 import { checkReceipt } from "/lib/pwx-receipt.mjs";
 import { LOG_TRUSTS } from "/log-trust.mjs";
+import { checkStatus, statusFor } from "/lib/pwx-status.mjs";
 
 const LOADER = location.origin;
 // Hosted spike: each app gets its own origin from a fixed pool (ports stand in for per-app
@@ -210,6 +211,69 @@ const logLine = (s) => s.logged
   ? `In the public log: checked on this device, with ${s.witnesses} witness signatures.`
   : `Not in the public log (${s.reason}). It can still be installed for now; later, PWX will refuse releases that aren't logged.`;
 
+// ---------- release status (M4 section 5a) ----------
+// The loader keeps a verified copy of the public log's list of withdrawn and revoked releases,
+// and when it last checked. Opening an app uses that copy and never waits for the network; the
+// list is refreshed in the background at most once a day. It downloads the whole list, so no
+// request reveals which apps are on this device, and never accepts an older list than it has.
+const DAY = 86400000, STALE_DAYS = 30, STATUS_KEY = "pwx-release-status";
+const clockShift = TEST ? Number(test("clock") ?? 0) * DAY : 0; // test builds: pretend days passed
+const now = () => Date.now() + clockShift;
+function savedStatus() { try { const v = JSON.parse(localStorage.getItem(STATUS_KEY)); return v && Number.isFinite(v.checkedAt) ? v : null; } catch { return null; } }
+// At most one request a day reaches the host, even when it fails (a host without a list isn't
+// asked again on every launch). An attempt made offline reaches no one, so it doesn't count:
+// a device that reconnects checks straight away.
+const ATTEMPT_KEY = "pwx-release-status-attempt";
+async function refreshStatus({ force = false } = {}) {
+  const saved = savedStatus();
+  if (!force && saved && now() - saved.checkedAt < DAY) return saved;
+  let tried = 0; try { tried = Number(localStorage.getItem(ATTEMPT_KEY)) || 0; } catch {}
+  if (!force && now() - tried < DAY) return saved;
+  try {
+    const res = await fetch("/log/status.json", { cache: "no-store" });
+    try { localStorage.setItem(ATTEMPT_KEY, String(now())); } catch {}
+    if (!res.ok) throw new Error(`the public log answered ${res.status}`);
+    const v = await checkStatus(await res.json(), LOG_TRUSTS);
+    if (saved && saved.origin === v.origin && v.size < saved.size) throw new Error("the public log offered an older list than this device has");
+    const next = { checkedAt: now(), origin: v.origin, size: v.size, entries: v.entries };
+    try { localStorage.setItem(STATUS_KEY, JSON.stringify(next)); } catch {}
+    state.statusRefresh = "ok";
+    return next;
+  } catch (err) { state.statusRefresh = String(err.message ?? err); return saved; }
+}
+function ago(ms) {
+  const d = Math.max(0, now() - ms), m = 60000, h = 60 * m;
+  if (d < 2 * m) return "just now";
+  if (d < h) return `${Math.round(d / m)} minutes ago`;
+  if (d < DAY) return `${Math.round(d / h)} hours ago`;
+  const days = Math.round(d / DAY);
+  return days === 1 ? "1 day ago" : `${days} days ago`;
+}
+const statusLine = (s) => s ? `Release status checked against the public log ${ago(s.checkedAt)}.` : "Release status not checked against the public log yet.";
+const isStale = (s) => !s || now() - s.checkedAt > STALE_DAYS * DAY;
+function statusNotice(entry) {
+  if (!entry) return null;
+  const said = entry.message ? ` The publisher says: "${entry.message}"` : "";
+  return entry.reason === "revoked"
+    ? `The publisher revoked this version as unsafe, so it won't start.${said} Its data is still on this device.`
+    : `The publisher withdrew this version.${said}${entry.replacement ? ` Version ${entry.replacement} replaces it.` : ""}`;
+}
+// Asks once before opening an app whose status hasn't been checked for a long time.
+function confirmStale(s) {
+  return new Promise((resolve) => {
+    const make = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls, textContent: text });
+    const box = make("div", "panel stale-check", "");
+    const open = make("button", "btn", "Open anyway"), wait = make("button", "btn", "Not now");
+    open.id = "stale-open"; wait.id = "stale-wait"; open.type = wait.type = "button";
+    box.append(make("p", "confirm-title", s ? `This app's release status was last checked ${ago(s.checkedAt)}.` : "This app's release status hasn't been checked yet."),
+      make("p", "muted", "Connect to the internet to check it's still safe, or open it anyway."), open, " ", wait);
+    $("stage").append(box);
+    state.phase = "stale-check";
+    open.addEventListener("click", () => { box.remove(); resolve(true); });
+    wait.addEventListener("click", () => { box.remove(); resolve(false); });
+  });
+}
+
 function describe(m, fp, log) {
   const c = m.capabilities ?? {};
   const hosts = c.network?.connect ?? [];
@@ -231,7 +295,7 @@ const showIntro = (on) => { for (const id of INTRO) { const el = $(id); if (el) 
 function showLines(lines) {
   showIntro(false);
   $("consent").hidden = false;
-  $("consent").replaceChildren(...lines.map((line) => Object.assign(document.createElement("div"), { textContent: line })));
+  $("consent").replaceChildren(...lines.map((line) => Object.assign(document.createElement("div"), { textContent: line, className: line.startsWith("Release status") ? "status-line" : "" })));
 }
 
 // Consent is a decision: nothing is installed until the user confirms (test builds auto-confirm).
@@ -293,13 +357,29 @@ async function launch(id) {
   if (state.locked) throw new PwxError("loader", "this loader is locked");
   const { manifest } = await verifyPackage(record.text, { allowLoopbackHttp: dev, trustedPublisher: record.publisher });
   state.manifest = manifest;
+  // Release status: the saved copy, or (first time on this device only) a quick check.
+  // A copy older than a day, or none: try a quick check first (a few seconds at most), so a device
+  // that has just reconnected shows the current status rather than asking.
+  let rs = savedStatus();
+  if (!rs || now() - rs.checkedAt >= DAY || test("check") === "now") rs = await Promise.race([refreshStatus({ force: test("check") === "now" }), new Promise((r) => setTimeout(() => r(rs), 4000))]);
+  const entry = rs ? statusFor(rs.entries, record) : null;
+  state.releaseStatus = { checkedAt: rs?.checkedAt ?? null, reason: entry?.reason ?? null };
+  if (entry?.reason === "revoked") {
+    $("library").hidden = true;
+    showLines([`${record.name ?? id} ${record.version}`, statusNotice(entry), statusLine(rs)]);
+    state.phase = "revoked";
+    return status(statusNotice(entry), "error");
+  }
+  // Ask only when this device has checked before and that check is old (a device that never
+  // could check, like pwx-local today or a host without a status list, just says so in App facts).
+  if (rs && isStale(rs) && !(await confirmStale(rs))) { state.phase = "stale-declined"; return showLibrary(); }
   const headers = buildHeaders(manifest, LOADER);
   state.headers = headers;
   const APP = await appOrigin(manifest.id, record);
   state.appOrigin = APP;
   $("library").hidden = true;
   state.logStatus = await logStatus(record.text, manifest);
-  showLines(describe(manifest, await fingerprint(manifest.publisher), state.logStatus));
+  showLines([...describe(manifest, await fingerprint(manifest.publisher), state.logStatus), statusLine(rs), ...(entry ? [statusNotice(entry)] : [])]);
 
   status("Installing verified files on the app origin…");
   // The app origin verifies the package again itself; it doesn't take files or headers from here.
@@ -320,7 +400,18 @@ async function launch(id) {
   const appName = record.name ?? manifest.name ?? id;
   await becomeAppPage({ ...record, id }, appName);
   state.phase = "running";
+  if (entry) status(statusNotice(entry), "warn");
   offerAppInstall({ ...record, id }, appName);
+  // Background refresh; if it changes this app's status while it runs, say so (and stop a revoked app).
+  refreshStatus({ force: test("check") === "now" }).then((next) => {
+    if (!next || next.checkedAt === rs?.checkedAt) return;
+    const now2 = statusFor(next.entries, record);
+    state.releaseStatus = { checkedAt: next.checkedAt, reason: now2?.reason ?? null };
+    const line = document.querySelector("#consent .status-line"); if (line) line.textContent = statusLine(next);
+    if (!now2) return;
+    if (now2.reason === "revoked") { document.querySelector("iframe.app")?.remove(); state.phase = "revoked"; }
+    status(statusNotice(now2), now2.reason === "revoked" ? "error" : "warn");
+  });
 }
 
 // Once an app runs, the page is that app's: its own address, install manifest, icon and name. So
@@ -472,6 +563,7 @@ showA2hsGuide();
 
 async function main() {
   await loaderReady;
+  if (!params.get("pkg") && !params.get("open") && !appHome) refreshStatus({ force: test("check") === "now" }).then((s) => { state.statusCheckedAt = s?.checkedAt ?? null; });
   const name = params.get("pkg"), open = appHome ?? params.get("open");
   if (appHome && !(await library.get(appHome))) {
     // A home-screen app can start with an empty library (iPhone keeps each home-screen app's

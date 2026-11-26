@@ -96,6 +96,20 @@ Every install **and every launch** runs the same checks (`verifyPackage`):
 6. Updates must be newer: an older version, or the same version with different contents, is
    rejected (rollback).
 
+### 4.0 Release status (M4 section 5a, release 0.4.12)
+
+Publishers can log that a release is `withdrawn` (a bug, replaced) or `revoked` (unsafe), signed
+by the release's publisher key (`pwx-log withdraw`). The log host serves `/log/status.json`:
+every such entry with its inclusion proof against the witnessed checkpoint (`pwx-log status`).
+The loader downloads the whole list (never a per-app request), at most once a day that reaches
+the host, checks the checkpoint and every entry on the device (`lib/pwx-status.mjs`), keeps the
+newest verified copy and when it was checked, and never accepts a list for a smaller log.
+Opening an app uses the saved copy; only a copy older than a day triggers a short check first.
+An entry applies only to the same app, publisher key and manifest. Withdrawn: the app runs with
+a notice and the publisher's message. Revoked: the app won't start (a running one is stopped);
+its data stays. App facts show when the status was last checked; if a device checked before and
+that was more than 30 days ago, the loader asks once, with **Open anyway**.
+
 ### 4.1 Log receipts (M4, soft mode)
 
 The public log ([`M4.md`](M4.md)) is published as static files in the C2SP formats, so any web
@@ -275,4 +289,4 @@ and per-app origins from the user's own machine.
 - Per-app subdomains for hosted mode (the spike uses 20 ports).
 - Moving notes from the old `pwx-notes` database.
 - Other spec features tracked as audit finding M4: required mode for receipts, key history and
-  revocation in the loader, independent witnesses, the revocation list download, monitors.
+  revocation in the loader (release withdrawal and revocation are in, 0.4.12), independent witnesses, monitors.
